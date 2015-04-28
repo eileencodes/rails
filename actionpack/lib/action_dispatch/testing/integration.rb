@@ -3,8 +3,10 @@ require 'uri'
 require 'active_support/core_ext/kernel/singleton_class'
 require 'active_support/core_ext/object/try'
 require 'active_support/core_ext/string/strip'
+require 'active_support/test_case'
 require 'rack/test'
 require 'minitest'
+require 'action_controller/template_assertions'
 
 module ActionDispatch
   module Integration #:nodoc:
@@ -36,10 +38,6 @@ module ActionDispatch
       #
       #   get '/feed', params: { since: 201501011400 }
       #   post '/profile', headers: { "X-Test-Header" => "testvalue" }
-      def get(path, *args)
-        process_with_kwargs(:get, path, *args)
-      end
-
       # Performs a POST request with the given parameters. See +#get+ for more
       # details.
       def post(path, *args)
@@ -290,6 +288,11 @@ module ActionDispatch
           @_mock_session ||= Rack::MockSession.new(@app, host)
         end
 
+        REQUEST_KWARGS = %i(params headers env xhr)
+        def kwarg_request?(args)
+          args[0].respond_to?(:keys) && args[0].keys.any? { |k| REQUEST_KWARGS.include?(k) }
+        end
+
         def process_with_kwargs(http_method, path, *args)
           if kwarg_request?(args)
             process(http_method, path, *args)
@@ -297,11 +300,6 @@ module ActionDispatch
             non_kwarg_request_warning if args.any?
             process(http_method, path, { params: args[0], headers: args[1] })
           end
-        end
-
-        REQUEST_KWARGS = %i(params headers env xhr)
-        def kwarg_request?(args)
-          args[0].respond_to?(:keys) && args[0].keys.any? { |k| REQUEST_KWARGS.include?(k) }
         end
 
         def non_kwarg_request_warning
@@ -456,9 +454,9 @@ module ActionDispatch
       # Copy the instance variables from the current session instance into the
       # test instance.
       def copy_session_variables! #:nodoc:
-        @controller = @integration_session.controller
-        @response   = @integration_session.response
-        @request    = @integration_session.request
+        @controller = integration_session.controller
+        @response   = integration_session.response
+        @request    = integration_session.request
       end
 
       def default_url_options
@@ -471,6 +469,25 @@ module ActionDispatch
 
       def respond_to?(method, include_private = false)
         integration_session.respond_to?(method, include_private) || super
+      end
+
+      def get(path, *args)
+        process_with_kwargs(:get, path, *args)
+        copy_session_variables!
+      end
+
+      REQUEST_KWARGS = %i(params headers env xhr)
+      def kwarg_request?(args)
+        args[0].respond_to?(:keys) && args[0].keys.any? { |k| REQUEST_KWARGS.include?(k) }
+      end
+
+      def process_with_kwargs(http_method, path, *args)
+        if kwarg_request?(args)
+          integration_session.send(:process, http_method, path, *args)
+        else
+          non_kwarg_request_warning if args.present?
+          integration_session.send(:process, http_method, path, { params: args[0], headers: args[1] })
+        end
       end
 
       # Delegate unhandled messages to the current session instance.

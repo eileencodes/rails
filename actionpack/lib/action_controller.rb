@@ -3,6 +3,7 @@ require 'abstract_controller'
 require 'action_dispatch'
 require 'action_controller/metal/live'
 require 'action_controller/metal/strong_parameters'
+require 'action_dispatch/testing/integration'
 
 module ActionController
   extend ActiveSupport::Autoload

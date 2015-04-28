@@ -314,7 +314,8 @@ class CookiesTest < ActionController::TestCase
   end
 
   def test_setting_cookie_with_secure
-    @request.env["HTTPS"] = "on"
+    request.env["HTTPS"] = "on"
+    p method(:get).source_location
     get :authenticate_with_secure
     assert_cookie_header "user_name=david; path=/; secure"
     assert_equal({"user_name" => "david"}, @response.cookies)
@@ -1148,7 +1149,8 @@ class CookiesTest < ActionController::TestCase
 
   private
     def assert_cookie_header(expected)
-      header = @response.headers["Set-Cookie"]
+      p integration_session.response
+      header = response.headers["Set-Cookie"]
       if header.respond_to?(:to_str)
         assert_equal expected.split("\n").sort, header.split("\n").sort
       else

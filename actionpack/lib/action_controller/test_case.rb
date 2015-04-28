@@ -249,7 +249,7 @@ module ActionController
   # If you're using named routes, they can be easily tested using the original named routes' methods straight in the test case.
   #
   #  assert_redirected_to page_url(title: 'foo')
-  class TestCase < ActiveSupport::TestCase
+  class TestCase < ActionDispatch::IntegrationTest
     module Behavior
       extend ActiveSupport::Concern
       include ActionDispatch::TestProcess
@@ -316,9 +316,6 @@ module ActionController
       #
       # Note that the request method is not verified. The different methods are
       # available to make the tests more expressive.
-      def get(action, *args)
-        process_with_kwargs("GET", action, *args)
-      end
 
       # Simulate a POST request with the given parameters and set/volley the response.
       # See +get+ for more details.
@@ -552,7 +549,7 @@ module ActionController
         else
           non_kwarg_request_warning if args.any?
 
-          args = args.unshift(http_method)
+          args = args.unshift(http_method.to_s.upcase)
           process(action, *args)
         end
       end
