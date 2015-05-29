@@ -454,10 +454,6 @@ module ActionController
 
         @request.env['REQUEST_METHOD'] = http_method
 
-        controller_class_name = @controller.class.anonymous? ?
-          "anonymous" :
-          @controller.class.controller_path
-
         @request.assign_parameters(@routes, controller_class_name, action.to_s, parameters)
 
         @request.session.update(session) if session
@@ -495,6 +491,10 @@ module ActionController
         end
 
         @response
+      end
+
+      def controller_class_name
+        @controller.class.anonymous? ? "anonymous" : @controller.class.controller_path
       end
 
       def setup_controller_request_and_response
@@ -543,15 +543,18 @@ module ActionController
       private
 
       def process_with_kwargs(http_method, action, *args)
-        if kwarg_request?(args)
-          args.first.merge!(method: http_method)
-          process(action, *args)
-        else
-          non_kwarg_request_warning if args.any?
+# path is actually getting passed in to the other
+# how to get path from the args?
+# {:params=>{:document=>{:title=>"New things", :content=>"Doing them"}}}
+        parameters = {}
+        parameters = parameters.symbolize_keys.merge(controller: controller_class_name, action: action.to_s)
+        path = @routes.generate_extras(parameters).first
 
-          args = args.unshift(http_method.to_s.upcase)
-          process(action, *args)
+        if kwarg_request?(args) && args.nil?
+          non_kwarg_request_warning
         end
+
+        super(http_method, path, *args)
       end
 
       REQUEST_KWARGS = %i(params session flash method body xhr)
