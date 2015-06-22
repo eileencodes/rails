@@ -318,18 +318,9 @@ module ActionDispatch
           MSG
         end
 
-        # Performs the actual request.
-        def process(method, path, params: nil, headers: nil, env: nil, xhr: false)
-          if path =~ %r{://}
-            location = URI.parse(path)
-            https! URI::HTTPS === location if location.scheme
-            host! "#{location.host}:#{location.port}" if location.host
-            path = location.query ? "#{location.path}?#{location.query}" : location.path
-          end
-
+        def make_env(method, params, path, host, remote_addr, accept)
           hostname, port = host.split(':')
-
-          request_env = {
+          {
             :method => method,
             :params => params,
 
@@ -344,6 +335,18 @@ module ActionDispatch
             "CONTENT_TYPE"   => "application/x-www-form-urlencoded",
             "HTTP_ACCEPT"    => accept
           }
+        end
+
+        # Performs the actual request.
+        def process(method, path, params: nil, headers: nil, env: nil, xhr: false)
+          if path =~ %r{://}
+            location = URI.parse(path)
+            https! URI::HTTPS === location if location.scheme
+            host! "#{location.host}:#{location.port}" if location.host
+            path = location.query ? "#{location.path}?#{location.query}" : location.path
+          end
+
+          request_env = make_env(method, params, path, host, remote_addr, accept)
 
           if xhr
             headers ||= {}

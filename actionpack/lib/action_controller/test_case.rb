@@ -375,6 +375,10 @@ module ActionController
         end
       end
 
+      def make_env(method, params, path, host, remote_addr, accept)
+        super
+      end
+
       # Simulate a HTTP request to +action+ by specifying request method,
       # parameters and set/volley the response.
       #
@@ -541,6 +545,16 @@ module ActionController
       end
 
       private
+
+      def app
+        return super unless defined?(@request)
+        request = @request
+        the_app = super
+        lambda { |env|
+          new_env = env.merge! request.env
+          the_app.call new_env
+        }
+      end
 
       def process_with_kwargs(http_method, action, *args)
 # path is actually getting passed in to the other
