@@ -522,6 +522,7 @@ module ActionController
         end
 
         @request          = build_request
+        @request.env["rack.request.cookie_hash"] = {}.with_indifferent_access
         @response         = build_response response_klass
         @response.request = @request
 

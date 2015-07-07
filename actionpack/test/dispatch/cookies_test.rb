@@ -1108,6 +1108,10 @@ class CookiesTest < ActionController::TestCase
     assert_equal 'andrew', cookies[:user_name]
   end
 
+  require 'objspace'
+  ObjectSpace.trace_object_allocations_start
+  include ObjectSpace
+
   def test_can_set_request_cookies
     @request.cookies['user_name'] = 'david'
     get :noop
@@ -1119,6 +1123,9 @@ class CookiesTest < ActionController::TestCase
     assert_equal 'david', cookies[:user_name]
 
     @request.cookies[:user_name] = 'andrew'
+    p allocation_sourcefile(@request.env) => allocation_sourceline(@request.env)
+    p :TEST => @request.cookies
+    p :TEST => @request.cookie_jar.instance_variable_get(:@cookies)
     get :noop
     assert_equal 'andrew', cookies['user_name']
     assert_equal 'andrew', cookies[:user_name]

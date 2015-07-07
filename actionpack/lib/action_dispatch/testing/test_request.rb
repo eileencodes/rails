@@ -65,7 +65,7 @@ module ActionDispatch
 
     alias :rack_cookies :cookies
 
-    def cookies
+    def xcookies
       @cookies ||= {}.with_indifferent_access
     end
 
