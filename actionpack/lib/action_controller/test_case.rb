@@ -16,11 +16,11 @@ module ActionController
     end
 
     # Create a new test request with default `env` values
-    def self.create
+    def self.create(controller)
       env = {}
       env = Rails.application.env_config.merge(env) if defined?(Rails.application) && Rails.application
       env["rack.request.cookie_hash"] = {}.with_indifferent_access
-      new(default_env.merge(env), new_session)
+      new(default_env.merge(env), new_session, controller)
     end
 
     def self.default_env
@@ -28,11 +28,30 @@ module ActionController
     end
     private_class_method :default_env
 
-    def initialize(env, session)
+    def initialize(env, session, controller)
       super(env)
+
+      @controller = controller
 
       self.session = session
       self.session_options = TestSession::DEFAULT_OPTIONS
+    end
+
+    class DispatchAdapter
+      def initialize(controller)
+        @controller = controller
+      end
+
+      def action(name)
+        controller = @controller
+        lambda { |env|
+          controller.dispatch(name, ActionDispatch::Request.new(env))
+        }
+      end
+    end
+
+    def controller_class
+      DispatchAdapter.new(@controller)
     end
 
     def query_string=(string)
@@ -479,7 +498,7 @@ module ActionController
         @request.set_header 'HTTP_COOKIE', cookies.to_header
         @request.delete_header 'action_dispatch.cookies'
 
-        @request          = TestRequest.new scrub_env!(@request.env), @request.session
+        @request          = TestRequest.new scrub_env!(@request.env), @request.session, @controller
         @response         = build_response @response_klass
         @response.request = @request
         @controller.recycle!
@@ -512,12 +531,16 @@ module ActionController
         end
 
         @controller.recycle!
-        @controller.process(action)
+        status, headers, body = @routes.router.serve @request
+        body.each { |_| }
+        #@controller.process(action)
 
         @request.delete_header 'HTTP_COOKIE'
 
         if @request.have_cookie_jar?
-          unless @response.committed?
+          if @response.committed?
+            @request.cookie_jar.write(@response)
+          else @response.committed?
             @request.cookie_jar.write(@response)
             self.cookies.update(@request.cookie_jar.instance_variable_get(:@cookies))
           end
@@ -569,7 +592,7 @@ module ActionController
           end
         end
 
-        @request          = TestRequest.create
+        @request          = TestRequest.create(@controller)
         @response         = build_response @response_klass
         @response.request = @request
 

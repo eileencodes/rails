@@ -183,7 +183,7 @@ module ActionDispatch
           end
 
           # Assume given controller
-          request = ActionController::TestRequest.create
+          request = ActionController::TestRequest.create(Object.new)
 
           if path =~ %r{://}
             fail_on(URI::InvalidURIError, msg) do
