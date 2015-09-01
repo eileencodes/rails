@@ -472,6 +472,7 @@ module ActionController
         end
 
         self.cookies.update @request.cookies
+        self.cookies.update_cookies_from_jar
         @request.env['HTTP_COOKIE'] = cookies.to_header
         @request.env['action_dispatch.cookies'] = nil
 
