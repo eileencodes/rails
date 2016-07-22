@@ -40,3 +40,10 @@ class ActionDispatch::IntegrationTest
     super
   end
 end
+
+class ActionDispatch::SystemTest
+  def before_setup # :nodoc:
+    @routes = Rails.application.routes
+    super
+  end
+end

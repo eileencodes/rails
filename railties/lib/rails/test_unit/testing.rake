@@ -26,7 +26,7 @@ namespace :test do
   desc "Run tests quickly, but also reset db"
   task :db => %w[db:test:prepare test]
 
-  ["models", "helpers", "controllers", "mailers", "integration", "jobs"].each do |name|
+  ["models", "helpers", "controllers", "mailers", "integration", "system", "jobs"].each do |name|
     task name => "test:prepare" do
       $: << "test"
       Minitest.rake_run(["test/#{name}"])

@@ -140,6 +140,7 @@ module Rails
       empty_directory_with_keep_file 'test/models'
       empty_directory_with_keep_file 'test/helpers'
       empty_directory_with_keep_file 'test/integration'
+      empty_directory_with_keep_file 'test/system'
 
       template 'test/test_helper.rb'
     end
