@@ -178,6 +178,10 @@ class ActionDispatch::IntegrationTest < ActiveSupport::TestCase
   end
 end
 
+class ActionDispatch::SystemTestCase < ActionDispatch::IntegrationTest
+  puts "hi?"
+end
+
 # Temporary base class
 class Rack::TestCase < ActionDispatch::IntegrationTest
   def self.testing(klass = nil)
