@@ -83,6 +83,8 @@ instance_eval File.read local_gemfile if File.exist? local_gemfile
 group :test do
   # FIX: Our test suite isn't ready to run in random order yet.
   gem 'minitest', '< 5.3.4'
+  gem 'capybara'
+  gem 'selenium-webdriver'
 
   platforms :mri do
     gem 'stackprof'
