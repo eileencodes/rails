@@ -1,8 +1,8 @@
 require 'capybara/rails'
 require 'rack/handler/puma'
-require 'action_dispatch/testing/system/abstract_driver'
+require 'rails/system/abstract_driver'
 
-module ActionDispatch
+module Rails
   module System
     include AbstractDriver::SeleniumDriver
   end
