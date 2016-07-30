@@ -1,10 +1,10 @@
 require 'capybara/rails'
 require 'rack/handler/puma'
-require 'action_dispatch/testing/system/abstract_driver'
+require 'action_dispatch/testing/system/driver_adapter'
 
 module ActionDispatch
   module System
-    include AbstractDriver::SeleniumDriver
+    include DriverAdapter
   end
 
   class SystemTestCase < ActiveSupport::TestCase
