@@ -94,7 +94,7 @@ module ActionDispatch
     autoload :Integration
     autoload :IntegrationTest, 'action_dispatch/testing/integration'
     autoload :System
-    autoload :SystemTest,      'action_dispatch/testing/system'
+    autoload :SystemTestCase,      'action_dispatch/testing/system'
     autoload :TestProcess
     autoload :TestRequest
     autoload :TestResponse
