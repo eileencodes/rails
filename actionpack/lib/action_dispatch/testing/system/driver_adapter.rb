@@ -11,7 +11,8 @@ module ActionDispatch
 
       module ClassMethods
         def driver_adapter=(driver_name_or_class)
-          DriverAdapters.lookup(driver_name_or_class).new
+          driver = DriverAdapters.lookup(driver_name_or_class).new
+          driver.call
         end
       end
     end
