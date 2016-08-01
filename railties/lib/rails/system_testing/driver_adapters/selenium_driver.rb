@@ -46,7 +46,7 @@ module Rails
         end
 
         def set_driver
-          Capybara.default_driver = (ENV["BROWSER"] || @browser).to_sym
+          Capybara.default_driver = @browser.to_sym
         end
 
         def set_port
