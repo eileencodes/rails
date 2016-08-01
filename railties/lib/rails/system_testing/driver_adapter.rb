@@ -1,7 +1,7 @@
-require 'action_dispatch/testing/system/driver_adapters'
+require 'rails/system_testing/driver_adapters'
 
-module ActionDispatch
-  module System
+module Rails
+  module SystemTesting
     module DriverAdapter
       extend ActiveSupport::Concern
 

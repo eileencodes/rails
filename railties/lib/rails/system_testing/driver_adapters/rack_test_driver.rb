@@ -1,5 +1,5 @@
-module ActionDispatch
-  module System
+module Rails
+  module SystemTesting
     module DriverAdapters
       class RackTestDriver
         def call

@@ -8,6 +8,7 @@ require 'action_controller'
 require 'action_controller/test_case'
 require 'action_dispatch/testing/integration'
 require 'rails/generators/test_case'
+require 'rails/system_testing'
 
 require 'active_support/testing/autorun'
 
@@ -41,7 +42,7 @@ class ActionDispatch::IntegrationTest
   end
 end
 
-class ActionDispatch::SystemTestCase
+class Rails::SystemTestCase
   def before_setup # :nodoc:
     @routes = Rails.application.routes
     super

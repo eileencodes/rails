@@ -1,7 +1,7 @@
 require 'selenium-webdriver'
 
-module ActionDispatch
-  module System
+module Rails
+  module SystemTesting
     module DriverAdapters
       class SeleniumDriver
         def initialize(browser: :chrome, server: :puma, port: 28100, screen_size: [1400,1400])
@@ -37,7 +37,7 @@ module ActionDispatch
 
         def register_server
           Capybara.register_server @server do |app, port|
-            Rack::Handler::Puma.run(app, Port: port, Threads: '0:4')
+            ::Rack::Handler::Puma.run(app, Port: port, Threads: '0:4')
           end
         end
 

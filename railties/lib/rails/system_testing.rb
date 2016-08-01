@@ -1,9 +1,9 @@
 require 'capybara/rails'
 require 'rack/handler/puma'
-require 'action_dispatch/testing/system/driver_adapter'
+require 'rails/system_testing/driver_adapter'
 
-module ActionDispatch
-  module System
+module Rails
+  module SystemTesting
     include DriverAdapter
   end
 
