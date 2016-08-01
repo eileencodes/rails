@@ -3,8 +3,8 @@ module Rails
     module DriverAdapters
       extend ActiveSupport::Autoload
 
-      autoload :RackTestDriver
-      autoload :SeleniumDriver
+      autoload :CapybaraRackTestDriver
+      autoload :CapybaraSeleniumDriver
 
       class << self
         def lookup(name)

@@ -3,7 +3,7 @@ require 'selenium-webdriver'
 module Rails
   module SystemTesting
     module DriverAdapters
-      class SeleniumDriver
+      class CapybaraSeleniumDriver
         def initialize(browser: :chrome, server: :puma, port: 28100, screen_size: [1400,1400])
           @browser = browser
           @server  = server

@@ -6,7 +6,7 @@ module Rails
       extend ActiveSupport::Concern
 
       included do
-        self.driver_adapter = :selenium_driver
+        self.driver_adapter = :capybara_selenium_driver
       end
 
       module ClassMethods

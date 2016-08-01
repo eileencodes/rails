@@ -1,7 +1,7 @@
 module Rails
   module SystemTesting
     module DriverAdapters
-      class RackTestDriver
+      class CapybaraRackTestDriver
         def call
           registration
         end
