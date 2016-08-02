@@ -11,8 +11,6 @@ module Rails
                                    fixture_replacement: nil
 
       c.integration_tool :test_unit
-
-      c.system_tool      :test_unit
     end
 
     initializer "test_unit.line_filtering" do

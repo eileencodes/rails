@@ -50,7 +50,6 @@ module Rails
         force_plural: false,
         helper: true,
         integration_tool: nil,
-        system_tool: nil,
         javascripts: true,
         javascript_engine: :js,
         orm: false,
