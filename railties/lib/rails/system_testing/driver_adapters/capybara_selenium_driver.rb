@@ -1,3 +1,4 @@
+require 'rack/handler/puma'
 require 'selenium-webdriver'
 
 module Rails
