@@ -42,6 +42,7 @@ DEFAULT_APP_FILES = %w(
   test/helpers
   test/mailers
   test/integration
+  test/system
   vendor
   tmp
   tmp/cache
@@ -786,6 +787,25 @@ class AppGeneratorTest < Rails::Generators::TestCase
     end
 
     assert_equal 3, @sequence_step
+  end
+
+  def test_system_tests_directory_generated
+    run_generator
+
+    assert_file("test/system/.keep")
+    assert_directory("test/system")
+  end
+
+  def test_system_tests_are_not_generated_on_system_test_skip
+    run_generator [destination_root, "--skip-system-test"]
+
+    assert_no_directory("test/system")
+  end
+
+  def test_system_tests_are_not_generated_on_test_skip
+    run_generator [destination_root, "--skip-test"]
+
+    assert_no_directory("test/system")
   end
 
   protected
