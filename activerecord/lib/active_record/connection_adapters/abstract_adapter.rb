@@ -107,6 +107,7 @@ module ActiveRecord
         @schema_cache        = SchemaCache.new self
         @quoted_column_names, @quoted_table_names = {}, {}
         @visitor             = arel_visitor
+        @lock                = Mutex.new
 
         if self.class.type_cast_config_to_boolean(config.fetch(:prepared_statements) { true })
           @prepared_statements = true
@@ -586,7 +587,11 @@ module ActiveRecord
           :name           => name,
           :connection_id  => object_id,
           :statement_name => statement_name,
-          :binds          => binds) { yield }
+          :binds          => binds) do
+            @lock.synchronize do
+              yield
+            end
+          end
       rescue => e
         raise translate_exception_class(e, sql)
       end

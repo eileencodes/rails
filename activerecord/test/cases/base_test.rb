@@ -1538,4 +1538,20 @@ class BasicsTest < ActiveRecord::TestCase
     assert Developer.new.respond_to?(:last_name=)
     assert Developer.new.respond_to?(:last_name?)
   end
+
+  def test_connections_whatever
+    ActiveRecord::Base.connection_pool.lock_thread = true
+    thread_a = Thread.new do
+      200.times do
+        Company.first
+      end
+    end
+
+    200.times do
+      Company.first
+    end
+
+    thread_a.join
+    ActiveRecord::Base.connection_pool.lock_thread = false
+  end
 end
