@@ -107,7 +107,7 @@ module ActiveRecord
         @schema_cache        = SchemaCache.new self
         @quoted_column_names, @quoted_table_names = {}, {}
         @visitor             = arel_visitor
-        @lock                = Mutex.new
+        @lock                = Monitor.new
 
         if self.class.type_cast_config_to_boolean(config.fetch(:prepared_statements) { true })
           @prepared_statements = true
@@ -583,7 +583,7 @@ module ActiveRecord
       def log(sql, name = "SQL", binds = [], statement_name = nil)
         @instrumenter.instrument(
           "sql.active_record",
-          :sql            => sql,
+          :sql            => "#{sql} + #{__id__}",
           :name           => name,
           :connection_id  => object_id,
           :statement_name => statement_name,

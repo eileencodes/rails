@@ -58,14 +58,20 @@ module ActiveRecord
       # the same SQL query and repeatedly return the same result each time, silently
       # undermining the randomness you were expecting.
       def clear_query_cache
-        @query_cache.clear
+        @lock.synchronize do
+          @query_cache.clear
+        end
       end
 
       def select_all(arel, name = nil, binds = [], preparable: nil)
         if @query_cache_enabled && !locked?(arel)
           arel, binds = binds_from_relation arel, binds
           sql = to_sql(arel, binds)
-          cache_sql(sql, binds) { super(sql, name, binds, preparable: preparable) }
+          cache_sql(sql, binds) do
+            result = super(sql, name, binds, preparable: preparable)
+            puts "DEBUG in cache sql #{sql}" if result.nil?
+            result
+          end
         else
           super
         end
@@ -73,16 +79,18 @@ module ActiveRecord
 
       private
 
-      def cache_sql(sql, binds)
-        result =
-          if @query_cache[sql].key?(binds)
-            ActiveSupport::Notifications.instrument("sql.active_record",
-              :sql => sql, :binds => binds, :name => "CACHE", :connection_id => object_id)
-            @query_cache[sql][binds]
-          else
-            @query_cache[sql][binds] = yield
-          end
-        result.dup
+      def cache_sql(sql, binds, &block)
+        @lock.synchronize do
+          result =
+            if @query_cache[sql].key?(binds)
+              ActiveSupport::Notifications.instrument("sql.active_record",
+                :sql => sql, :binds => binds, :name => "CACHE", :connection_id => object_id)
+              @query_cache[sql][binds]
+            else
+              @query_cache[sql][binds] = yield
+            end
+          result.dup
+        end
       end
 
       # If arel is locked this is a SELECT ... FOR UPDATE or somesuch. Such
