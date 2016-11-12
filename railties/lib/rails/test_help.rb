@@ -42,7 +42,7 @@ class ActionDispatch::IntegrationTest
   end
 end
 
-class ActionSystemTestCase
+class ActionSystemTest::Base
   def before_setup # :nodoc:
     @routes = Rails.application.routes
     super
