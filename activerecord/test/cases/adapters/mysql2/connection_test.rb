@@ -44,7 +44,7 @@ class Mysql2ConnectionTest < ActiveRecord::Mysql2TestCase
     assert !@connection.active?
 
     # Repair all fixture connections so other tests won't break.
-    @fixture_connections.each(&:verify!)
+    fixture_connections.each(&:verify!)
   end
 
   def test_successful_reconnection_after_timeout_with_manual_reconnect

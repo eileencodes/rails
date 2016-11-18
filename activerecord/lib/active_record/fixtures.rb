@@ -979,8 +979,7 @@ module ActiveRecord
         end
 
         # Begin transactions for connections already established
-        @fixture_connections = enlist_fixture_connections
-        @fixture_connections.each do |connection|
+        fixture_connections.each do |connection|
           connection.begin_transaction joinable: false
         end
 
@@ -995,7 +994,7 @@ module ActiveRecord
               connection = nil
             end
 
-            if connection && !@fixture_connections.include?(connection)
+            if connection && !fixture_connections.include?(connection)
               connection.begin_transaction joinable: false
               @fixture_connections << connection
             end
@@ -1017,10 +1016,9 @@ module ActiveRecord
       # Rollback changes if a transaction is active.
       if run_in_transaction?
         ActiveSupport::Notifications.unsubscribe(@connection_subscriber) if @connection_subscriber
-        @fixture_connections.each do |connection|
+        fixture_connections.each do |connection|
           connection.rollback_transaction if connection.transaction_open?
         end
-        @fixture_connections.clear
       else
         ActiveRecord::FixtureSet.reset_cache
       end
@@ -1033,6 +1031,10 @@ module ActiveRecord
     end
 
     private
+      def fixture_connections
+        enlist_fixture_connections + @fixture_connections
+      end
+
       def load_fixtures(config)
         fixtures = ActiveRecord::FixtureSet.create_fixtures(fixture_path, fixture_table_names, fixture_class_names, config)
         Hash[fixtures.map { |f| [f.name, f] }]
