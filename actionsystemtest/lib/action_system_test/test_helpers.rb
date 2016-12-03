@@ -2,8 +2,7 @@ module ActionSystemTest
   module TestHelpers
     extend ActiveSupport::Autoload
 
-    autoload :Assertions
-    autoload :FormHelper
+    autoload :ActiveJobSetup
     autoload :ScreenshotHelper
   end
 end
