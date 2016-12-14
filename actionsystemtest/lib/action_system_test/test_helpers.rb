@@ -3,7 +3,6 @@ module ActionSystemTest
     extend ActiveSupport::Autoload
 
     autoload :Assertions
-    autoload :FormHelper
     autoload :ScreenshotHelper
   end
 end
