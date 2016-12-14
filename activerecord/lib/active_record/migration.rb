@@ -1039,7 +1039,22 @@ module ActiveRecord
         get_all_versions(connection).max || 0
       end
 
-      def needs_migration?(connection = Base.connection)
+      # ok so we're definitely looking at versions from bc3 and comparing
+      # them to versions in signal id so it thinks there are pending migrations
+      # i cannot tell if there is a bug in signal id or in rails :/
+      DUMMY = Object.new
+      def needs_migration?(connection = DUMMY)
+        if connection == DUMMY || connection == Base.connection
+          connection = Base.connection
+          migration = count_pending_migrations(connection)
+          Base.connection_pool.release_connection
+          migration
+        else
+          count_pending_migrations(connection)
+        end
+      end
+
+      def count_pending_migrations(connection) # :nodoc:
         (migrations(migrations_paths).collect(&:version) - get_all_versions(connection)).size > 0
       end
 

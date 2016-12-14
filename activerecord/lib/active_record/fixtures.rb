@@ -564,7 +564,12 @@ module ActiveRecord
           cache_fixtures(connection, fixtures_map)
         end
       end
-      cached_fixtures(connection, fixture_set_names)
+
+      data = cached_fixtures(connection, fixture_set_names)
+
+      connection.close
+
+      data
     end
 
     # Returns a consistent, platform-independent identifier for +label+.
@@ -981,6 +986,7 @@ module ActiveRecord
         # Begin transactions for connections already established
         fixture_connections.each do |connection|
           connection.begin_transaction joinable: false
+          connection.close
         end
 
         # When connections are established in the future, begin a transaction too
@@ -1017,7 +1023,10 @@ module ActiveRecord
       if run_in_transaction?
         ActiveSupport::Notifications.unsubscribe(@connection_subscriber) if @connection_subscriber
         fixture_connections.each do |connection|
-          connection.rollback_transaction if connection.transaction_open?
+          if connection.transaction_open?
+            connection.rollback_transaction
+            connection.try(:close)
+          end
         end
       else
         ActiveRecord::FixtureSet.reset_cache
