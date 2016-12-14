@@ -986,7 +986,6 @@ module ActiveRecord
         # Begin transactions for connections already established
         fixture_connections.each do |connection|
           connection.begin_transaction joinable: false
-          connection.close
         end
 
         # When connections are established in the future, begin a transaction too
@@ -1025,7 +1024,6 @@ module ActiveRecord
         fixture_connections.each do |connection|
           if connection.transaction_open?
             connection.rollback_transaction
-            connection.try(:close)
           end
         end
       else

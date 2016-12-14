@@ -4,7 +4,6 @@ require "active_record/connection_adapters/sqlite3/explain_pretty_printer"
 require "active_record/connection_adapters/sqlite3/quoting"
 require "active_record/connection_adapters/sqlite3/schema_creation"
 require "active_record/connection_adapters/sqlite3/schema_definitions"
-require "active_record/connection_adapters/sqlite3/schema_dumper"
 
 gem "sqlite3", "~> 1.3.6"
 require "sqlite3"
@@ -54,7 +53,6 @@ module ActiveRecord
       ADAPTER_NAME = "SQLite".freeze
 
       include SQLite3::Quoting
-      include SQLite3::ColumnDumper
 
       NATIVE_DATABASE_TYPES = {
         primary_key:  "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL",

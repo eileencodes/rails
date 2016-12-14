@@ -42,10 +42,6 @@
 
     *Prathamesh Sonpatki*
 
-*   PostgreSQL & MySQL: Use big integer as primary key type for new tables.
-
-    *Jon McCartie*, *Pavel Pravosud*
-
 *   Change the type argument of `ActiveRecord::Base#attribute` to be optional.
     The default is now `ActiveRecord::Type::Value.new`, which provides no type
     casting behavior.

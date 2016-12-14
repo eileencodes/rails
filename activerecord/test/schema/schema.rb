@@ -54,7 +54,7 @@ ActiveRecord::Schema.define do
 
   create_table :authors, force: true do |t|
     t.string :name, null: false
-    t.bigint :author_address_id
+    t.integer :author_address_id
     t.integer :author_address_extra_id
     t.string :organization_id
     t.string :owned_essay_id
@@ -124,9 +124,6 @@ ActiveRecord::Schema.define do
     t.integer :wheels_count
     t.column :lock_version, :integer, null: false, default: 0
     t.timestamps null: false
-  end
-
-  create_table :old_cars, id: :integer, force: true do |t|
   end
 
   create_table :carriers, force: true
@@ -306,7 +303,7 @@ ActiveRecord::Schema.define do
   end
 
   create_table :engines, force: true do |t|
-    t.bigint :car_id
+    t.integer :car_id
   end
 
   create_table :entrants, force: true do |t|
@@ -1007,7 +1004,7 @@ ActiveRecord::Schema.define do
   if supports_foreign_keys?
     # fk_test_has_fk should be before fk_test_has_pk
     create_table :fk_test_has_fk, force: true do |t|
-      t.bigint :fk_id, null: false
+      t.integer :fk_id, null: false
     end
 
     create_table :fk_test_has_pk, force: true, primary_key: "pk_id" do |t|

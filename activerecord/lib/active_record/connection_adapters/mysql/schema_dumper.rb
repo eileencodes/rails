@@ -3,9 +3,11 @@ module ActiveRecord
     module MySQL
       module ColumnDumper
         def column_spec_for_primary_key(column)
-          spec = super
-          if column.type == :integer && !column.auto_increment?
-            spec[:default] = schema_default(column) || "nil"
+          if column.bigint?
+            spec = { id: :bigint.inspect }
+            spec[:default] = schema_default(column) || "nil" unless column.auto_increment?
+          else
+            spec = super
           end
           spec[:unsigned] = "true" if column.unsigned?
           spec
