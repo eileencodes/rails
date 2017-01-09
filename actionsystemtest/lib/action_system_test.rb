@@ -50,14 +50,22 @@
 # driver defaults whereas the <tt>RailsSeleniumDriver</tt> has pre-set
 # configuration for browser, server, port, etc.
 
+require "capybara/dsl"
 require "action_system_test/test_helper"
 require "action_system_test/driver_adapter"
 
 module ActionSystemTest
+  include Capybara::DSL
   include ActionSystemTest::TestHelper
   include ActionSystemTest::DriverAdapter
 
   DEFAULT_DRIVER = :rails_selenium_driver
+
+  Capybara.app = Rack::Builder.new do
+    map "/" do
+      run Rails.application
+    end
+  end
 
   class Base < ActionDispatch::IntegrationTest
     include ActionSystemTest
