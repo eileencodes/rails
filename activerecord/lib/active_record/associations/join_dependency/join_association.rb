@@ -29,7 +29,10 @@ module ActiveRecord
           tables        = tables.reverse
 
           scope_chain_index = 0
-          scope_chain = scope_chain.reverse
+          scope_chain = scope_chain.reverse.map(&:dup)
+          scope_chain.freeze
+          scope_chain.each(&:freeze)
+          p :CHAIN_CLASSES => node.reflection.chain.map(&:class)
 
           # The chain starts with the target table, but we want to end with it here (makes
           # more sense in this context), so we reverse
@@ -43,6 +46,13 @@ module ActiveRecord
 
             constraint = build_constraint(klass, table, key, foreign_table, foreign_key)
 
+            p :PROCESSING => [reflection.class, chain.reverse[scope_chain_index].class]
+            a = reflection.scopes
+            b = scope_chain[scope_chain_index]
+            if a != b
+              puts "Class #{reflection.class} reflection.scopes: #{a} does not equal scope_chain: #{b}"
+              raise
+            end
             predicate_builder = PredicateBuilder.new(TableMetadata.new(klass, table))
             scope_chain_items = scope_chain[scope_chain_index].map do |item|
               if item.is_a?(Relation)
