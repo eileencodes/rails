@@ -23,10 +23,6 @@ module Rails
 
       hook_for :scaffold_controller, required: true
 
-      hook_for :system_tests, as: :system do |system_test|
-        invoke system_test unless options[:skip_system_test]
-      end
-
       hook_for :assets do |assets|
         invoke assets, [controller_name]
       end

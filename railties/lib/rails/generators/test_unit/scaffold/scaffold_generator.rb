@@ -17,6 +17,10 @@ module TestUnit # :nodoc:
         template_file = options.api? ? "api_functional_test.rb" : "functional_test.rb"
         template template_file,
                  File.join("test/controllers", controller_class_path, "#{controller_file_name}_controller_test.rb")
+
+        unless options.api?
+          template "system_test.rb", File.join("test/system", class_path, "#{file_name.pluralize}_test.rb")
+        end
       end
 
       def fixture_name
@@ -30,17 +34,21 @@ module TestUnit # :nodoc:
 
       private
 
-        def attributes_hash
-          return if attributes_names.empty?
+      def attributes_string
+        attributes_hash.map {|k, v| "#{k}: #{v}"}.join(", ")
+      end
 
-          attributes_names.map do |name|
-            if %w(password password_confirmation).include?(name) && attributes.any?(&:password_digest?)
-              "#{name}: 'secret'"
-            else
-              "#{name}: @#{singular_table_name}.#{name}"
-            end
-          end.sort.join(", ")
-        end
+      def attributes_hash
+        return {} if attributes_names.empty?
+
+        attributes_names.map do |name|
+          if %w(password password_confirmation).include?(name) && attributes.any?(&:password_digest?)
+            ["#{name}", "'secret'"]
+          else
+            ["#{name}", "@#{singular_table_name}.#{name}"]
+          end
+        end.sort.to_h
+      end
     end
   end
 end
