@@ -18,7 +18,7 @@ module TestUnit # :nodoc:
         template template_file,
                  File.join("test/controllers", controller_class_path, "#{controller_file_name}_controller_test.rb")
 
-        unless options.api?
+        if depends_on_system_test?
           template "system_test.rb", File.join("test/system", class_path, "#{file_name.pluralize}_test.rb")
         end
       end
@@ -34,21 +34,21 @@ module TestUnit # :nodoc:
 
       private
 
-      def attributes_string
-        attributes_hash.map {|k, v| "#{k}: #{v}"}.join(", ")
-      end
+        def attributes_string
+          attributes_hash.map { |k, v| "#{k}: #{v}" }.join(", ")
+        end
 
-      def attributes_hash
-        return {} if attributes_names.empty?
+        def attributes_hash
+          return {} if attributes_names.empty?
 
-        attributes_names.map do |name|
-          if %w(password password_confirmation).include?(name) && attributes.any?(&:password_digest?)
-            ["#{name}", "'secret'"]
-          else
-            ["#{name}", "@#{singular_table_name}.#{name}"]
-          end
-        end.sort.to_h
-      end
+          attributes_names.map do |name|
+            if %w(password password_confirmation).include?(name) && attributes.any?(&:password_digest?)
+              ["#{name}", "'secret'"]
+            else
+              ["#{name}", "@#{singular_table_name}.#{name}"]
+            end
+          end.sort.to_h
+        end
     end
   end
 end
