@@ -10,6 +10,8 @@ module TestUnit # :nodoc:
 
       class_option :api, type: :boolean,
                          desc: "Generates API functional tests"
+      class_option :skip_system_test, type: :boolean, default: false,
+                                      desc: "Skip system test files"
 
       argument :attributes, type: :array, default: [], banner: "field:type field:type"
 
@@ -18,7 +20,7 @@ module TestUnit # :nodoc:
         template template_file,
                  File.join("test/controllers", controller_class_path, "#{controller_file_name}_controller_test.rb")
 
-        if depends_on_system_test?
+        unless options.api? || options[:skip_system_test]
           template "system_test.rb", File.join("test/system", class_path, "#{file_name.pluralize}_test.rb")
         end
       end

@@ -12,8 +12,6 @@ module Rails
       class_option :assets, type: :boolean
       class_option :resource_route, type: :boolean
       class_option :scaffold_stylesheet, type: :boolean
-      class_option :skip_system_test, type: :boolean, default: false,
-                                      desc: "Skip system test files"
 
       def handle_skip
         @options = @options.merge(stylesheets: false) unless options[:assets]
