@@ -351,43 +351,57 @@ module ActiveRecord
     self.use_transactional_tests = false
 
     def setup
-      ActiveRecord::Tasks::DatabaseTasks.migrations_paths = "custom/path"
+      ActiveRecord::Tasks::DatabaseTasks.migrations_paths = MIGRATIONS_ROOT + "/valid"
     end
 
     def teardown
       ActiveRecord::Tasks::DatabaseTasks.migrations_paths = nil
     end
 
-    def test_migrate_receives_correct_env_vars
+    def test_migrate_set_and_unset_verbose_and_version_env_vars
       verbose, version = ENV["VERBOSE"], ENV["VERSION"]
 
+      ENV["VERSION"] = "2"
       ENV["VERBOSE"] = "false"
-      ENV["VERSION"] = "4"
-      ActiveRecord::Migrator.expects(:migrate).with("custom/path", 4)
-      ActiveRecord::Migration.expects(:verbose=).with(false)
-      ActiveRecord::Migration.expects(:verbose=).with(ActiveRecord::Migration.verbose)
-      ActiveRecord::Tasks::DatabaseTasks.migrate
 
-      ENV.delete("VERBOSE")
+      assert_empty capture_migration_output
+
       ENV.delete("VERSION")
-      ActiveRecord::Migrator.expects(:migrate).with("custom/path", nil)
-      ActiveRecord::Migration.expects(:verbose=).with(true)
-      ActiveRecord::Migration.expects(:verbose=).with(ActiveRecord::Migration.verbose)
-      ActiveRecord::Tasks::DatabaseTasks.migrate
+      ENV.delete("VERBOSE")
+
+      assert_includes capture_migration_output, "migrating"
+    ensure
+      ENV["VERBOSE"], ENV["VERSION"] = verbose, version
+    end
+
+    def test_migrate_set_and_unset_empty_values_for_verbose_and_version_env_vars
+      verbose, version = ENV["VERBOSE"], ENV["VERSION"]
+
+      ENV["VERSION"] = "2"
+      ENV["VERBOSE"] = "false"
+
+      assert_empty capture_migration_output
 
       ENV["VERBOSE"] = ""
       ENV["VERSION"] = ""
-      ActiveRecord::Migrator.expects(:migrate).with("custom/path", nil)
-      ActiveRecord::Migration.expects(:verbose=).with(true)
-      ActiveRecord::Migration.expects(:verbose=).with(ActiveRecord::Migration.verbose)
-      ActiveRecord::Tasks::DatabaseTasks.migrate
+
+      assert_includes capture_migration_output, "migrating"
+    ensure
+      ENV["VERBOSE"], ENV["VERSION"] = verbose, version
+    end
+
+    def test_migrate_set_and_unset_nonsense_values_for_verbose_and_version_env_vars
+      verbose, version = ENV["VERBOSE"], ENV["VERSION"]
+
+      ENV["VERSION"] = "2"
+      ENV["VERBOSE"] = "false"
+
+      assert_empty capture_migration_output
 
       ENV["VERBOSE"] = "yes"
-      ENV["VERSION"] = "0"
-      ActiveRecord::Migrator.expects(:migrate).with("custom/path", 0)
-      ActiveRecord::Migration.expects(:verbose=).with(true)
-      ActiveRecord::Migration.expects(:verbose=).with(ActiveRecord::Migration.verbose)
-      ActiveRecord::Tasks::DatabaseTasks.migrate
+      ENV["VERSION"] = "2"
+
+      assert_empty capture_migration_output
     ensure
       ENV["VERBOSE"], ENV["VERSION"] = verbose, version
     end
@@ -437,6 +451,13 @@ module ActiveRecord
       ActiveRecord::Base.expects(:clear_cache!)
       ActiveRecord::Tasks::DatabaseTasks.migrate
     end
+
+    private
+      def capture_migration_output
+        capture(:stdout) do
+          ActiveRecord::Tasks::DatabaseTasks.migrate
+        end
+      end
   end
 
   class DatabaseTasksPurgeTest < ActiveRecord::TestCase
