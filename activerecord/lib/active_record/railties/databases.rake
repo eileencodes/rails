@@ -19,6 +19,17 @@ db_namespace = namespace :db do
   end
 
   namespace :create do
+    databases = ActiveRecord::Tasks::DatabaseTasks.local_databases(Rails.application.config.database_configuration)
+
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases(databases) do |cluster_namespace, config|
+      desc "Create #{cluster_namespace} cluster"
+      task cluster_namespace do
+        next unless config["database"]
+
+        ActiveRecord::Tasks::DatabaseTasks.create(config)
+      end
+    end
+
     task all: :load_config do
       ActiveRecord::Tasks::DatabaseTasks.create_all
     end
@@ -26,10 +37,25 @@ db_namespace = namespace :db do
 
   desc "Creates the database from DATABASE_URL or config/database.yml for the current RAILS_ENV (use db:create:all to create all databases in the config). Without RAILS_ENV or when RAILS_ENV is development, it defaults to creating the development and test databases."
   task create: [:load_config] do
-    ActiveRecord::Tasks::DatabaseTasks.create_current
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases do |cluster_namespace, config|
+      next unless config["database"]
+
+      ActiveRecord::Tasks::DatabaseTasks.create(config)
+    end
   end
 
   namespace :drop do
+    databases = ActiveRecord::Tasks::DatabaseTasks.local_databases(Rails.application.config.database_configuration)
+
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases(databases) do |cluster_namespace, config|
+      desc "Drop #{cluster_namespace} cluster"
+      task cluster_namespace => :check_protected_environments do
+        next unless config["database"]
+
+        ActiveRecord::Tasks::DatabaseTasks.drop(config)
+      end
+    end
+
     task all: [:load_config, :check_protected_environments] do
       ActiveRecord::Tasks::DatabaseTasks.drop_all
     end
@@ -41,7 +67,11 @@ db_namespace = namespace :db do
   end
 
   task "drop:_unsafe" => [:load_config] do
-    ActiveRecord::Tasks::DatabaseTasks.drop_current
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases do |cluster_namespace, config|
+      next unless config["database"]
+
+      ActiveRecord::Tasks::DatabaseTasks.drop(config)
+    end
   end
 
   namespace :purge do
@@ -57,8 +87,11 @@ db_namespace = namespace :db do
 
   desc "Migrate the database (options: VERSION=x, VERBOSE=false, SCOPE=blog)."
   task migrate: :load_config do
-    ActiveRecord::Tasks::DatabaseTasks.migrate
-    db_namespace["_dump"].invoke
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases do |cluster_namespace, config|
+      ActiveRecord::Base.establish_connection(config)
+      ActiveRecord::Tasks::DatabaseTasks.migrate
+      db_namespace["_dump"].invoke
+    end
   end
 
   # IMPORTANT: This task won't dump the schema if ActiveRecord::Base.dump_schema_after_migration is set to false
@@ -77,6 +110,16 @@ db_namespace = namespace :db do
   end
 
   namespace :migrate do
+    databases = ActiveRecord::Tasks::DatabaseTasks.local_databases(Rails.application.config.database_configuration)
+
+    ActiveRecord::Tasks::DatabaseTasks.iterate_databases(databases) do |cluster_namespace, config|
+      desc "Migrate #{cluster_namespace} cluster"
+      task cluster_namespace do
+        ActiveRecord::Base.establish_connection(config)
+        ActiveRecord::Tasks::DatabaseTasks.migrate
+      end
+    end
+
     # desc  'Rollbacks the database one migration and re migrate up (options: STEP=x, VERSION=x).'
     task redo: :load_config do
       raise "Empty VERSION provided" if ENV["VERSION"] && ENV["VERSION"].empty?
@@ -246,11 +289,16 @@ db_namespace = namespace :db do
     desc "Creates a db/schema.rb file that is portable against any DB supported by Active Record"
     task dump: :load_config do
       require "active_record/schema_dumper"
-      filename = ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, "schema.rb")
-      File.open(filename, "w:utf-8") do |file|
-        ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
+      ActiveRecord::Tasks::DatabaseTasks.iterate_databases do |cluster_namespace, config, db|
+        if db.match(/^(development)_(.*)|(development)/)
+          filename = ActiveRecord::Tasks::DatabaseTasks.schema_dump_filename(cluster_namespace)
+          File.open(filename, "w:utf-8") do |file|
+            ActiveRecord::Base.establish_connection(config)
+            ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
+          end
+          db_namespace["schema:dump"].reenable
+        end
       end
-      db_namespace["schema:dump"].reenable
     end
 
     desc "Loads a schema.rb file into the database"
@@ -276,20 +324,23 @@ db_namespace = namespace :db do
         rm_f filename, verbose: false
       end
     end
-
   end
 
   namespace :structure do
     desc "Dumps the database structure to db/structure.sql. Specify another file with SCHEMA=db/my_structure.sql"
     task dump: :load_config do
-      filename = ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, "structure.sql")
-      current_config = ActiveRecord::Tasks::DatabaseTasks.current_config
-      ActiveRecord::Tasks::DatabaseTasks.structure_dump(current_config, filename)
-
-      if ActiveRecord::SchemaMigration.table_exists?
-        File.open(filename, "a") do |f|
-          f.puts ActiveRecord::Base.connection.dump_schema_information
-          f.print "\n"
+      ActiveRecord::Tasks::DatabaseTasks.iterate_databases do |cluster_namespace, config, db|
+        if db.match(/^(development)_(.*)|(development)/)
+          ActiveRecord::Base.establish_connection(config)
+          filename = ActiveRecord::Tasks::DatabaseTasks.structure_dump_filename(cluster_namespace)
+          current_config = ActiveRecord::Tasks::DatabaseTasks.current_config
+          ActiveRecord::Tasks::DatabaseTasks.structure_dump(current_config, filename)
+          if ActiveRecord::SchemaMigration.table_exists?
+            File.open(filename, "a") do |f|
+              f.puts ActiveRecord::Base.connection.dump_schema_information
+              f.print "\n"
+            end
+          end
         end
       end
       db_namespace["structure:dump"].reenable

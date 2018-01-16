@@ -134,6 +134,26 @@ module ActiveRecord
         end
       end
 
+      def local_databases(configs = ActiveRecord::Base.configurations)
+        groups = configs.group_by do |key, config|
+          if match = key.match(/^(development|test)_(.*)/)
+            match[2]
+          elsif match = key.match(/^(development|test)/)
+            "primary"
+          end
+        end
+
+        groups.delete_if { |k,_| k.nil? }
+      end
+
+      def iterate_databases(databases = local_databases, &blk)
+        databases.each do |cluster_namespace, configs|
+          configs.each do |db, config|
+            yield cluster_namespace, config, db
+          end
+        end
+      end
+
       def create_current(environment = env)
         each_current_configuration(environment) { |configuration|
           create configuration
@@ -263,6 +283,24 @@ module ActiveRecord
         when :sql
           File.join(db_dir, "structure.sql")
         end
+      end
+
+      def schema_dump_filename(namespace)
+        filename = if namespace == "primary"
+                     "schema.rb"
+                   else
+                     "#{namespace}_schema.rb"
+                   end
+        ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, filename)
+      end
+
+      def structure_dump_filename(namespace)
+        filename = if namespace == "primary"
+                     "structure.sql"
+                   else
+                     "#{namespace}_structure.sql"
+                   end
+        ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, filename)
       end
 
       def load_schema_current(format = ActiveRecord::Base.schema_format, file = nil, environment = env)
