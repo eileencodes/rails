@@ -63,8 +63,9 @@ module ActiveRecord
       DatabaseConfig = Struct.new(:env_name, :spec_name, :config)
 
       def self.walk_configs(env_name, spec_name, config)
+        set_spec = env_name == spec_name ? "primary" : spec_name
         if config["database"]
-          DatabaseConfig.new(env_name, spec_name, config)
+          DatabaseConfig.new(env_name, set_spec, config)
         else
           config.each_pair.map do |spec_name, sub_config|
             walk_configs env_name, spec_name, sub_config
