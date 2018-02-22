@@ -130,6 +130,7 @@ module ActiveRecord
     # and then establishes the connection.
     initializer "active_record.initialize_database" do
       ActiveSupport.on_load(:active_record) do
+        # this calls ar base which calls merge and resolve resolve which calls resolve_all
         self.configurations = Rails.application.config.database_configuration
 
         begin

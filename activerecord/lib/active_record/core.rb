@@ -60,6 +60,46 @@ module ActiveRecord
         @@configurations
       end
 
+      DatabaseConfig = Struct.new(:env_name, :spec_name, :config)
+
+      def self.walk_configs(env_name, spec_name, config)
+        if config["database"]
+          DatabaseConfig.new(env_name, spec_name, config)
+        else
+          config.each_pair.map do |spec_name, sub_config|
+            walk_configs env_name, spec_name, sub_config
+          end
+        end
+      end
+
+      ##
+      # YAML: default case
+      #
+      # development:
+      #   adapter: sqlite3
+      #   database: development.sqlite3
+      #
+      # development:
+      #   primary:
+      #     adapter: sqlite3
+      #     database: development.sqlite3
+      #   secondary:
+      #     adapter: sqlite3
+      #     database: secondaly.sqlite3
+      def self.configs_for(environment, &blk)
+        env_with_configs = configurations.slice(environment).each_pair.flat_map do |spec_name, config|
+          walk_configs(environment, spec_name, config)
+        end
+
+        if block_given?
+          env_with_configs.each do |env_with_config|
+            yield env_with_config.spec_name, env_with_config.config
+          end
+        else
+          env_with_configs
+        end
+      end
+
       ##
       # :singleton-method:
       # Determines whether to use Time.utc (using :utc) or Time.local (using :local) when pulling

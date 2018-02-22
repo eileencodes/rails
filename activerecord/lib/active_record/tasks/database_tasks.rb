@@ -138,7 +138,8 @@ module ActiveRecord
         each_current_configuration(environment) { |configuration|
           create configuration
         }
-        ActiveRecord::Base.establish_connection(environment.to_sym)
+        default_connection = ActiveRecord::Base.configs_for(environment).first.spec_name
+        ActiveRecord::Base.establish_connection(default_connection.to_sym)
       end
 
       def drop(*arguments)
@@ -173,9 +174,14 @@ module ActiveRecord
         verbose = verbose?
         scope = ENV["SCOPE"]
         verbose_was, Migration.verbose = Migration.verbose, verbose
-        Base.connection.migration_context.migrate(target_version) do |migration|
-          scope.blank? || scope == migration.scope
+
+        Base.configs_for(env) do |spec_name, config|
+          Base.establish_connection config
+          Base.connection.migration_context.migrate(target_version) do |migration|
+            scope.blank? || scope == migration.scope
+          end
         end
+
         ActiveRecord::Base.clear_cache!
       ensure
         Migration.verbose = verbose_was
@@ -314,10 +320,10 @@ module ActiveRecord
           environments = [environment]
           environments << "test" if environment == "development"
 
-          ActiveRecord::Base.configurations.slice(*environments).each do |configuration_environment, configuration|
-            next unless configuration["database"]
-
-            yield configuration, configuration_environment
+          environments.each do |env|
+            ActiveRecord::Base.configs_for(env) do |config_spec_name, configuration|
+              yield configuration, config_spec_name
+            end
           end
         end
 
