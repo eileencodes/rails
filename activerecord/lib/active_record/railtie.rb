@@ -133,7 +133,11 @@ module ActiveRecord
         self.configurations = Rails.application.config.database_configuration
 
         begin
-          establish_connection
+          if configurations["primary"]
+            establish_connection :primary
+          else
+            establish_connection
+          end
         rescue ActiveRecord::NoDatabaseError
           warn <<-end_warning
 Oops - You have a database configured, but it doesn't exist yet!
