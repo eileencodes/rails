@@ -54,12 +54,12 @@ module ApplicationTests
     test "after_initialize runs after frameworks have been initialized" do
       $activerecord_configurations = nil
       add_to_config <<-RUBY
-        config.after_initialize { $activerecord_configurations = ActiveRecord::Base.configurations }
+        config.after_initialize { $activerecord_configurations = ActiveRecord::Base.configurations(legacy: false) }
       RUBY
 
       require "#{app_path}/config/environment"
       assert $activerecord_configurations
-      assert $activerecord_configurations["development"]
+      assert_equal "db/development.sqlite3", $activerecord_configurations.default_config_hash("development")["database"]
     end
 
     test "after_initialize happens after to_prepare in development" do

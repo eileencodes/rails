@@ -95,7 +95,7 @@ module Rails
 
     # The name of the database adapter for the current environment.
     property "Database adapter" do
-      ActiveRecord::Base.configurations[Rails.env]["adapter"]
+      ActiveRecord::Base.configurations(legacy: false).default_config_hash(Rails.env)["adapter"]
     end
 
     property "Database schema version" do

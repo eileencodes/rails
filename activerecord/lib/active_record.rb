@@ -40,7 +40,7 @@ module ActiveRecord
   autoload :Core
   autoload :ConnectionHandling
   autoload :CounterCache
-  autoload :DatabaseConfigurations
+  autoload :DatabaseConfiguration, "active_record/database_configurations"
   autoload :DynamicMatchers
   autoload :Enum
   autoload :InternalMetadata

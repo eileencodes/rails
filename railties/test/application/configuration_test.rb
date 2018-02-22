@@ -1996,6 +1996,11 @@ module ApplicationTests
       assert_equal false, ActionView::Template.finalize_compiled_template_methods
     end
 
+    test "ActiveRecord::Base.use_legacy_configurations is false by default" do
+      app "development"
+      assert_equal false, ActiveRecord::Base.use_legacy_configurations
+    end
+
     private
       def force_lazy_load_hooks
         yield # Tasty clarifying sugar, homie! We only need to reference a constant to load it.
