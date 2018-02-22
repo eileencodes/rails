@@ -5,7 +5,7 @@ require "models/person"
 
 module ActiveRecord
   module ConnectionAdapters
-    class ConnectionHandlerTest < ActiveRecord::TestCase
+    class LegacyConnectionHandlerTest < ActiveRecord::TestCase
       self.use_transactional_tests = false
 
       fixtures :people
@@ -13,7 +13,9 @@ module ActiveRecord
       def setup
         @handler = ConnectionHandler.new
         @spec_name = "primary"
-        config = ActiveRecord::Base.configurations(legacy: false).default_config("arunit")
+        config = assert_deprecated do
+          ActiveRecord::Base.configurations["arunit"]
+        end
         @pool = @handler.establish_connection(config)
       end
 
@@ -29,16 +31,19 @@ module ActiveRecord
       end
 
       def test_establish_connection_uses_spec_name
+        assert_deprecated do
+          @prev_configs = ActiveRecord::Base.configurations
+        end
         config = { "readonly" => { "adapter" => "sqlite3", "database" => "db/readonly.sqlite3" } }
-        old_configurations = ActiveRecord::Base.configurations(legacy: false)
         ActiveRecord::Base.configurations = config
+
         resolver = ConnectionAdapters::ConnectionSpecification::Resolver.new(ActiveRecord::Base.configurations(legacy: false))
         spec =   resolver.spec(:readonly)
         @handler.establish_connection(spec.to_hash)
 
         assert_not_nil @handler.retrieve_connection_pool("readonly")
       ensure
-        ActiveRecord::Base.configurations = old_configurations
+        ActiveRecord::Base.configurations = @prev_configs
         @handler.remove_connection("readonly")
       end
 
@@ -56,7 +61,9 @@ module ActiveRecord
           },
           "common" => { "adapter" => "sqlite3", "database" => "db/common.sqlite3" }
         }
-        @prev_configs = ActiveRecord::Base.configurations(legacy: false)
+        assert_deprecated do
+          @prev_configs = ActiveRecord::Base.configurations
+        end
         ActiveRecord::Base.configurations = config
 
         @handler.establish_connection(:common)
@@ -90,7 +97,9 @@ module ActiveRecord
               "readonly" => { "adapter" => "sqlite3", "database" => "db/another-readonly.sqlite3" }
             }
           }
-          @prev_configs = ActiveRecord::Base.configurations(legacy: false)
+          assert_deprecated do
+            @prev_configs = ActiveRecord::Base.configurations
+          end
           ActiveRecord::Base.configurations = config
 
           ActiveRecord::Base.establish_connection
@@ -114,7 +123,9 @@ module ActiveRecord
               "adapter" => "sqlite3", "database" => "db/bad-primary.sqlite3"
             }
           }
-          @prev_configs = ActiveRecord::Base.configurations(legacy: false)
+          assert_deprecated do
+            @prev_configs = ActiveRecord::Base.configurations
+          end
           ActiveRecord::Base.configurations = config
 
           ActiveRecord::Base.establish_connection
@@ -130,7 +141,9 @@ module ActiveRecord
 
       def test_establish_connection_using_two_level_configurations
         config = { "development" => { "adapter" => "sqlite3", "database" => "db/primary.sqlite3" } }
-        @prev_configs = ActiveRecord::Base.configurations(legacy: false)
+        assert_deprecated do
+          @prev_configs = ActiveRecord::Base.configurations
+        end
         ActiveRecord::Base.configurations = config
 
         @handler.establish_connection(:development)
@@ -146,7 +159,9 @@ module ActiveRecord
           "development" => { "adapter" => "sqlite3", "database" => "db/primary.sqlite3" },
           "development_readonly" => { "adapter" => "sqlite3", "database" => "db/readonly.sqlite3" }
         }
-        @prev_configs = ActiveRecord::Base.configurations(legacy: false)
+        assert_deprecated do
+          @prev_configs = ActiveRecord::Base.configurations
+        end
         ActiveRecord::Base.configurations = config
 
         @handler.establish_connection(:development_readonly)
@@ -305,8 +320,9 @@ module ActiveRecord
           wr.binmode
 
           pid = fork do
-            config = ActiveRecord::Base.configurations(legacy: false).default_config("arunit")
-            config["database"] = file.path
+            assert_deprecated do
+              ActiveRecord::Base.configurations["arunit"]["database"] = file.path
+            end
             ActiveRecord::Base.establish_connection(:arunit)
 
             pid2 = fork do

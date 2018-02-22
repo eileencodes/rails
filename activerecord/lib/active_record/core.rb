@@ -51,14 +51,45 @@ module ActiveRecord
       #      }
       #   }
       def self.configurations=(config)
-        @@configurations = ActiveRecord::ConnectionHandling::MergeAndResolveDefaultUrlConfig.new(config).resolve
+        # once we get this passing i think i want to chang ehow this works
+        # i think it should return an object that contains an array of objects
+        #
+        # something like
+        #
+        # DatabaseConfigurations @configurations=[ DatabaseConfig::HashConfig, DatabaseConfig::UrlConfig ]
+        #
+        # that way we can operate on the main object isntead of an array of objects.
+        #
+        # DatabaseConfigurations.default_config
+        #   returns object
+        #
+        # etc
+        # can the hash known?
+        if config.is_a?(ActiveRecord::DatabaseConfigurations)
+          @@configurations = config
+        else
+          formatted_configs = ActiveRecord::DatabaseConfigurations.new(config)
+          @@configurations = ActiveRecord::ConnectionHandling::MergeAndResolveDefaultUrlConfig.new(formatted_configs).configs
+        end
       end
-      self.configurations = {}
 
       # Returns fully resolved configurations hash
-      def self.configurations
-        @@configurations
+      def self.configurations(legacy: true)
+        if legacy
+          ActiveSupport::Deprecation.warn \
+            "Returning a hash of configs from ActiveRecord::Base.configurations is deprecated. In Rails 6.1 it will return an array of objects. To use the new behavior please add `legacy: false` to your `configurations call."
+          ConnectionAdapters::ConnectionSpecification::LegacyResolver.new(@@configurations.configurations).resolve_all
+        else
+          @@configurations
+        end
       end
+
+      # fix the tasks
+      # deprecate self.configurations
+      # rename resolver2
+      # use new method DatabaseConfigurations.configurations
+      # add tests that duplicate the hashes to objects
+      self.configurations = {}
 
       ##
       # :singleton-method:

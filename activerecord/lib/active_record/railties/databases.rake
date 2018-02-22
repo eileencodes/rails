@@ -26,7 +26,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Create #{spec_name} database for current environment"
       task spec_name => :load_config do
-        db_config = ActiveRecord::DatabaseConfigurations.config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
         ActiveRecord::Tasks::DatabaseTasks.create(db_config.config)
       end
     end
@@ -45,7 +45,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Drop #{spec_name} database for current environment"
       task spec_name => [:load_config, :check_protected_environments] do
-        db_config = ActiveRecord::DatabaseConfigurations.config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
         ActiveRecord::Tasks::DatabaseTasks.drop(db_config.config)
       end
     end
@@ -73,7 +73,7 @@ db_namespace = namespace :db do
 
   desc "Migrate the database (options: VERSION=x, VERBOSE=false, SCOPE=blog)."
   task migrate: :load_config do
-    ActiveRecord::DatabaseConfigurations.configs_for(Rails.env) do |spec_name, config|
+    ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env) do |spec_name, config|
       ActiveRecord::Base.establish_connection(config)
       ActiveRecord::Tasks::DatabaseTasks.migrate
     end
@@ -99,7 +99,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Migrate #{spec_name} database for current environment"
       task spec_name => :load_config do
-        db_config = ActiveRecord::DatabaseConfigurations.config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
         ActiveRecord::Base.establish_connection(db_config.config)
         ActiveRecord::Tasks::DatabaseTasks.migrate
       end
@@ -274,8 +274,7 @@ db_namespace = namespace :db do
     desc "Creates a db/schema.rb file that is portable against any DB supported by Active Record"
     task dump: :load_config do
       require "active_record/schema_dumper"
-
-      ActiveRecord::DatabaseConfigurations.configs_for(Rails.env) do |spec_name, config|
+      ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env) do |spec_name, config|
         filename = ActiveRecord::Tasks::DatabaseTasks.dump_filename(spec_name, :ruby)
         File.open(filename, "w:utf-8") do |file|
           ActiveRecord::Base.establish_connection(config)
@@ -314,11 +313,10 @@ db_namespace = namespace :db do
   namespace :structure do
     desc "Dumps the database structure to db/structure.sql. Specify another file with SCHEMA=db/my_structure.sql"
     task dump: :load_config do
-      ActiveRecord::DatabaseConfigurations.configs_for(Rails.env) do |spec_name, config|
+      ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env) do |spec_name, config|
         ActiveRecord::Base.establish_connection(config)
         filename = ActiveRecord::Tasks::DatabaseTasks.dump_filename(spec_name, :sql)
         ActiveRecord::Tasks::DatabaseTasks.structure_dump(config, filename)
-
         if ActiveRecord::SchemaMigration.table_exists?
           File.open(filename, "a") do |f|
             f.puts ActiveRecord::Base.connection.dump_schema_information
@@ -356,27 +354,35 @@ db_namespace = namespace :db do
       begin
         should_reconnect = ActiveRecord::Base.connection_pool.active_connection?
         ActiveRecord::Schema.verbose = false
-        ActiveRecord::Tasks::DatabaseTasks.load_schema ActiveRecord::Base.configurations["test"], :ruby, ENV["SCHEMA"], "test"
+        ActiveRecord::Base.configurations(legacy: false).configs_for("test") do |spec_name, config|
+          filename = ActiveRecord::Tasks::DatabaseTasks.dump_filename(spec_name, :ruby)
+          ActiveRecord::Tasks::DatabaseTasks.load_schema(config, :ruby, filename, "test")
+        end
       ensure
         if should_reconnect
-          ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations[ActiveRecord::Tasks::DatabaseTasks.env])
+          ActiveRecord::Base.establish_connection(ActiveRecord::Base.configurations(legacy: false).default_config(ActiveRecord::Tasks::DatabaseTasks.env))
         end
       end
     end
 
     # desc "Recreate the test database from an existent structure.sql file"
     task load_structure: %w(db:test:purge) do
-      ActiveRecord::Tasks::DatabaseTasks.load_schema ActiveRecord::Base.configurations["test"], :sql, ENV["SCHEMA"], "test"
+      ActiveRecord::Base.configurations(legacy: false).configs_for("test") do |spec_name, config|
+        filename = filename = ActiveRecord::Tasks::DatabaseTasks.dump_filename(spec_name, :sql)
+        ActiveRecord::Tasks::DatabaseTasks.load_schema(config, :sql, filename, "test")
+      end
     end
 
     # desc "Empty the test database"
     task purge: %w(load_config check_protected_environments) do
-      ActiveRecord::Tasks::DatabaseTasks.purge ActiveRecord::Base.configurations["test"]
+      ActiveRecord::Base.configurations(legacy: false).configs_for("test") do |_, config|
+        ActiveRecord::Tasks::DatabaseTasks.purge(config)
+      end
     end
 
     # desc 'Load the test schema'
     task prepare: :load_config do
-      unless ActiveRecord::Base.configurations.blank?
+      unless ActiveRecord::Base.configurations(legacy: false).blank?
         db_namespace["test:load"].invoke
       end
     end

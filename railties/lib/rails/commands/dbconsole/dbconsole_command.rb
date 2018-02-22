@@ -92,12 +92,17 @@ module Rails
         # We need to check whether the user passed the connection the
         # first time around to show a consistent error message to people
         # relying on 2-level database configuration.
-        if @options["connection"] && configurations[connection].blank?
+        if @options["connection"] && configurations.find { |x| x.env_name == connection }.nil?
           raise ActiveRecord::AdapterNotSpecified, "'#{connection}' connection is not configured. Available configuration: #{configurations.inspect}"
-        elsif configurations[environment].blank? && configurations[connection].blank?
+        elsif configurations.find { |x| x.env_name == environment }.nil? && configurations.find { |x| x.env_name == connection }.nil?
           raise ActiveRecord::AdapterNotSpecified, "'#{environment}' database is not configured. Available configuration: #{configurations.inspect}"
         else
-          configurations[connection] || configurations[environment].presence
+          db_config = configurations.find { |x| x.env_name == connection || x.env_name == environment }
+          if db_config
+            db_config.config
+          else
+            {}
+          end
         end
       end
     end
@@ -114,7 +119,7 @@ module Rails
       def configurations # :doc:
         require APP_PATH
         ActiveRecord::Base.configurations = Rails.application.config.database_configuration
-        ActiveRecord::Base.configurations
+        ActiveRecord::Base.configurations(legacy: false).configurations
       end
 
       def find_cmd_and_exec(commands, *args) # :doc:
