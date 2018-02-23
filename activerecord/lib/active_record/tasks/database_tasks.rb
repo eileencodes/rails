@@ -138,8 +138,8 @@ module ActiveRecord
         each_current_configuration(environment) { |configuration|
           create configuration
         }
-        default_connection = ActiveRecord::Base.configs_for(environment).first.spec_name
-        ActiveRecord::Base.establish_connection(default_connection.to_sym)
+        default_connection = ActiveRecord::Base.configs_for(environment).first.config
+        ActiveRecord::Base.establish_connection(default_connection)
       end
 
       def drop(*arguments)
@@ -175,11 +175,8 @@ module ActiveRecord
         scope = ENV["SCOPE"]
         verbose_was, Migration.verbose = Migration.verbose, verbose
 
-        Base.configs_for(env) do |spec_name, config|
-          Base.establish_connection config
-          Base.connection.migration_context.migrate(target_version) do |migration|
-            scope.blank? || scope == migration.scope
-          end
+        Base.connection.migration_context.migrate(target_version) do |migration|
+          scope.blank? || scope == migration.scope
         end
 
         ActiveRecord::Base.clear_cache!
@@ -269,6 +266,24 @@ module ActiveRecord
         when :sql
           File.join(db_dir, "structure.sql")
         end
+      end
+
+      def schema_dump_filename(namespace)
+        filename = if namespace == "primary"
+                     "schema.rb"
+                   else
+                     "#{namespace}_schema.rb"
+                   end
+        ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, filename)
+      end
+
+      def structure_dump_filename(namespace)
+        filename = if namespace == "primary"
+                     "structure.sql"
+                   else
+                     "#{namespace}_structure.sql"
+                   end
+        ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, filename)
       end
 
       def load_schema_current(format = ActiveRecord::Base.schema_format, file = nil, environment = env)

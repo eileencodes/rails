@@ -19,6 +19,14 @@ db_namespace = namespace :db do
   end
 
   namespace :create do
+    databases = Rails.application.config.database_configuration
+    ActiveRecord::Base.configs_for(Rails.env, databases) do |spec_name, config|
+      desc "Create #{spec_name} database for current environment"
+      task spec_name do
+        ActiveRecord::Tasks::DatabaseTasks.create(config)
+      end
+    end
+
     task all: :load_config do
       ActiveRecord::Tasks::DatabaseTasks.create_all
     end
@@ -30,6 +38,14 @@ db_namespace = namespace :db do
   end
 
   namespace :drop do
+    databases = Rails.application.config.database_configuration
+    ActiveRecord::Base.configs_for(Rails.env, databases) do |spec_name, config|
+      desc "Drop #{spec_name} database for current environment"
+      task spec_name => :check_protected_environments do
+        ActiveRecord::Tasks::DatabaseTasks.drop(config)
+      end
+    end
+
     task all: [:load_config, :check_protected_environments] do
       ActiveRecord::Tasks::DatabaseTasks.drop_all
     end
@@ -57,8 +73,11 @@ db_namespace = namespace :db do
 
   desc "Migrate the database (options: VERSION=x, VERBOSE=false, SCOPE=blog)."
   task migrate: :load_config do
-    ActiveRecord::Tasks::DatabaseTasks.migrate
-    db_namespace["_dump"].invoke
+    ActiveRecord::Base.configs_for(Rails.env) do |spec_name, config|
+      ActiveRecord::Base.establish_connection(config)
+      ActiveRecord::Tasks::DatabaseTasks.migrate
+      db_namespace["_dump"].invoke
+    end
   end
 
   # IMPORTANT: This task won't dump the schema if ActiveRecord::Base.dump_schema_after_migration is set to false
@@ -77,6 +96,15 @@ db_namespace = namespace :db do
   end
 
   namespace :migrate do
+    databases = Rails.application.config.database_configuration
+    ActiveRecord::Base.configs_for(Rails.env, databases) do |spec_name, config|
+      desc "Migrate #{spec_name} database for current environment"
+      task spec_name do
+        ActiveRecord::Base.establish_connection(config)
+        ActiveRecord::Tasks::DatabaseTasks.migrate
+      end
+    end
+
     # desc  'Rollbacks the database one migration and re migrate up (options: STEP=x, VERSION=x).'
     task redo: :load_config do
       raise "Empty VERSION provided" if ENV["VERSION"] && ENV["VERSION"].empty?
@@ -246,9 +274,12 @@ db_namespace = namespace :db do
     desc "Creates a db/schema.rb file that is portable against any DB supported by Active Record"
     task dump: :load_config do
       require "active_record/schema_dumper"
-      filename = ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, "schema.rb")
-      File.open(filename, "w:utf-8") do |file|
-        ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
+      ActiveRecord::Base.configs_for(Rails.env) do |spec_name, config|
+        filename = ActiveRecord::Tasks::DatabaseTasks.schema_dump_filename(spec_name)
+        File.open(filename, "w:utf-8") do |file|
+          ActiveRecord::Base.establish_connection(config)
+          ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection, file)
+        end
       end
       db_namespace["schema:dump"].reenable
     end
@@ -282,14 +313,16 @@ db_namespace = namespace :db do
   namespace :structure do
     desc "Dumps the database structure to db/structure.sql. Specify another file with SCHEMA=db/my_structure.sql"
     task dump: :load_config do
-      filename = ENV["SCHEMA"] || File.join(ActiveRecord::Tasks::DatabaseTasks.db_dir, "structure.sql")
-      current_config = ActiveRecord::Tasks::DatabaseTasks.current_config
-      ActiveRecord::Tasks::DatabaseTasks.structure_dump(current_config, filename)
-
-      if ActiveRecord::SchemaMigration.table_exists?
-        File.open(filename, "a") do |f|
-          f.puts ActiveRecord::Base.connection.dump_schema_information
-          f.print "\n"
+      ActiveRecord::Base.configs_for(Rails.env) do |spec_name, config|
+        ActiveRecord::Base.establish_connection(config)
+        filename = ActiveRecord::Tasks::DatabaseTasks.structure_dump_filename(spec_name)
+        current_config = ActiveRecord::Tasks::DatabaseTasks.current_config
+        ActiveRecord::Tasks::DatabaseTasks.structure_dump(config, filename)
+        if ActiveRecord::SchemaMigration.table_exists?
+          File.open(filename, "a") do |f|
+            f.puts ActiveRecord::Base.connection.dump_schema_information
+            f.print "\n"
+          end
         end
       end
       db_namespace["structure:dump"].reenable

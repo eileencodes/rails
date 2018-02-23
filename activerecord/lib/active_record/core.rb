@@ -87,8 +87,8 @@ module ActiveRecord
       #   secondary:
       #     adapter: sqlite3
       #     database: secondaly.sqlite3
-      def self.configs_for(environment, &blk)
-        env_with_configs = configurations.slice(environment).each_pair.flat_map do |spec_name, config|
+      def self.configs_for(environment, configs = configurations, &blk)
+        env_with_configs = configs.slice(environment).each_pair.flat_map do |spec_name, config|
           walk_configs(environment, spec_name, config)
         end
 
