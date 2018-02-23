@@ -132,13 +132,10 @@ module ActiveRecord
       ActiveSupport.on_load(:active_record) do
         # this calls ar base which calls merge and resolve resolve which calls resolve_all
         self.configurations = Rails.application.config.database_configuration
+        config = ActiveRecord::Base.configs_for(Rails.env, configurations).first.config
 
         begin
-          if configurations["primary"]
-            establish_connection :primary
-          else
-            establish_connection
-          end
+          establish_connection(config)
         rescue ActiveRecord::NoDatabaseError
           warn <<-end_warning
 Oops - You have a database configured, but it doesn't exist yet!
