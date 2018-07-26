@@ -812,7 +812,6 @@ module ApplicationTests
 
           class EnvironmentTest < ActiveSupport::TestCase
             def test_environment
-              ActiveRecord::Base.configurations = Rails.application.config.database_configuration
               test_db = ActiveRecord::Base.configurations(legacy: false).default_config(#{env.dump})["database"]
               db_file = ActiveRecord::Base.connection_config[:database]
               assert_match(test_db, db_file)
