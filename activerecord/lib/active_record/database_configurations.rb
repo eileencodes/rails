@@ -11,23 +11,23 @@ module ActiveRecord
     end
 
     attr_accessor :configurations
-# i think we need to move the others up here (configs_for, etc) and then
-    # we need to figure out which ones should be instance vars. AND then we need
-    # to update the code for those. in the end it will be better because there
-    # will be ONE OBJECT TO RULE THEM ALL.
 
-    # Selects the config for the specified environment and specification name
-    #
-    # For example if passed :development, and :animals it will select the database
-    # under the :development and :animals configuration level
+    def default_config(env)
+      default = configurations.find { |db_config| db_config.env_name == env }
+      default.config if default
+    end
+
+    def select_db_config(env)
+      configurations.find do |db_config|
+        db_config.env_name == env.to_s ||
+          (db_config.for_current_env? && db_config.spec_name == env.to_s)
+      end
+    end
+
     def config_for_env_and_spec(environment, specification_name)
       configs_for(environment).find do |db_config|
         db_config.spec_name == specification_name
       end
-    end
-
-    def default_config(env)
-      configurations.find { |db_config| db_config.env_name == env }.config
     end
 
     # Collects the configs for the environment passed in.
@@ -49,6 +49,7 @@ module ActiveRecord
         env_with_configs
       end
     end
+    alias :[] :configs_for
 
     # Walks all the configs passed in and returns an array
     # of DatabaseConfig structs for each configuration.
@@ -91,7 +92,6 @@ module ActiveRecord
         end
       end
     end
-
 
     def format_configs(configs)
       db_configs = configs.each_pair.flat_map do |env_name, config|

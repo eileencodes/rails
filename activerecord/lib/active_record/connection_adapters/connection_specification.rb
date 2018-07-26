@@ -109,7 +109,9 @@ module ActiveRecord
           end
       end
 
-      class LegacyResolver
+      ##
+      ## Builds a hash config to maintain backwards compatability.
+      class LegacyResolver # :nodoc:
         attr_reader :configurations
 
         # Accepts a list of db config objects.
@@ -256,31 +258,11 @@ module ActiveRecord
           #   Resolver.new("production" => {}).resolve_symbol_connection(:production)
           #   # => {}
           def resolve_symbol_connection(env_name, pool_name)
-            if db_config = select_db_config(env_name)
+            db_config = configurations.select_db_config(env_name)
+            if db_config
               resolve_connection(db_config.config).merge("name" => pool_name.to_s)
             else
               raise(AdapterNotSpecified, "'#{env_name}' database is not configured. Available: #{configurations.configurations.map(&:env_name).join(", ")}")
-            end
-          end
-
-          # maybe we can clean this up more?
-          # then move the connection handling for the url stuff
-          # deprecate configurations
-          # add tests for deprecated methods for new method
-          # docs?
-          # oof.
-          #
-          def select_db_config(env_name)
-            # fix me. this is weird to call configs.configs
-            if configurations.is_a?(Array)
-              p "an array"
-              configs = configurations
-            else
-              configs = configurations.configurations
-            end
-            configs.find do |db_config|
-              db_config.env_name == env_name.to_s ||
-                (db_config.for_current_env? && db_config.spec_name == env_name.to_s)
             end
           end
 
