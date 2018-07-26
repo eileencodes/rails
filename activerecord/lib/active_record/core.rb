@@ -51,20 +51,6 @@ module ActiveRecord
       #      }
       #   }
       def self.configurations=(config)
-        # once we get this passing i think i want to chang ehow this works
-        # i think it should return an object that contains an array of objects
-        #
-        # something like
-        #
-        # DatabaseConfigurations @configurations=[ DatabaseConfig::HashConfig, DatabaseConfig::UrlConfig ]
-        #
-        # that way we can operate on the main object isntead of an array of objects.
-        #
-        # DatabaseConfigurations.default_config
-        #   returns object
-        #
-        # etc
-        # can the hash known?
         if config.is_a?(ActiveRecord::DatabaseConfigurations)
           @@configurations = config
         else
@@ -84,11 +70,6 @@ module ActiveRecord
         end
       end
 
-      # fix the tasks
-      # deprecate self.configurations
-      # rename resolver2
-      # use new method DatabaseConfigurations.configurations
-      # add tests that duplicate the hashes to objects
       self.configurations = {}
 
       ##
