@@ -4,46 +4,6 @@ require "cases/helper"
 require "active_record/tasks/database_tasks"
 
 module ActiveRecord
-  module DatabaseTasksSetupper
-    def setup
-      @mysql_tasks, @postgresql_tasks, @sqlite_tasks = Array.new(
-        3,
-        Class.new do
-          def create; end
-          def drop; end
-          def purge; end
-          def charset; end
-          def collation; end
-          def structure_dump(*); end
-          def structure_load(*); end
-        end.new
-      )
-
-      $stdout, @original_stdout = StringIO.new, $stdout
-      $stderr, @original_stderr = StringIO.new, $stderr
-    end
-
-    def teardown
-      $stdout, $stderr = @original_stdout, @original_stderr
-    end
-
-    def with_stubbed_new
-      ActiveRecord::Tasks::MySQLDatabaseTasks.stub(:new, @mysql_tasks) do
-        ActiveRecord::Tasks::PostgreSQLDatabaseTasks.stub(:new, @postgresql_tasks) do
-          ActiveRecord::Tasks::SQLiteDatabaseTasks.stub(:new, @sqlite_tasks) do
-            yield
-          end
-        end
-      end
-    end
-  end
-
-  ADAPTERS_TASKS = {
-    mysql2:     :mysql_tasks,
-    postgresql: :postgresql_tasks,
-    sqlite3:    :sqlite_tasks
-  }
-
   class LegacyDatabaseTasksUtilsTask < ActiveRecord::TestCase
     def test_raises_an_error_when_called_with_protected_environment
       ActiveRecord::MigrationContext.any_instance.stubs(:current_version).returns(1)
@@ -110,20 +70,6 @@ module ActiveRecord
     def test_unregistered_task
       assert_raise(ActiveRecord::Tasks::DatabaseNotSupported) do
         ActiveRecord::Tasks::DatabaseTasks.structure_dump({ "adapter" => :bar }, "awesome-file.sql")
-      end
-    end
-  end
-
-  class LegacyDatabaseTasksCreateTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_create") do
-        with_stubbed_new do
-          assert_called(eval("@#{v}"), :create) do
-            ActiveRecord::Tasks::DatabaseTasks.create "adapter" => k
-          end
-        end
       end
     end
   end
@@ -450,20 +396,6 @@ module ActiveRecord
           ActiveRecord::Tasks::DatabaseTasks.create_current(
             ActiveSupport::StringInquirer.new("development")
           )
-        end
-      end
-    end
-  end
-
-  class LegacyDatabaseTasksDropTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_drop") do
-        with_stubbed_new do
-          assert_called(eval("@#{v}"), :drop) do
-            ActiveRecord::Tasks::DatabaseTasks.drop "adapter" => k
-          end
         end
       end
     end
@@ -876,20 +808,6 @@ module ActiveRecord
     end
   end
 
-  class LegacyDatabaseTasksPurgeTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_purge") do
-        with_stubbed_new do
-          assert_called(eval("@#{v}"), :purge) do
-            ActiveRecord::Tasks::DatabaseTasks.purge "adapter" => k
-          end
-        end
-      end
-    end
-  end
-
   class LegacyDatabaseTasksPurgeCurrentTest < ActiveRecord::TestCase
     def test_purges_current_environment_database
       assert_deprecated do
@@ -942,34 +860,6 @@ module ActiveRecord
       end
     ensure
       ActiveRecord::Base.configurations = @old_configurations
-    end
-  end
-
-  class LegacyDatabaseTasksCharsetTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_charset") do
-        with_stubbed_new do
-          assert_called(eval("@#{v}"), :charset) do
-            ActiveRecord::Tasks::DatabaseTasks.charset "adapter" => k
-          end
-        end
-      end
-    end
-  end
-
-  class LegacyDatabaseTasksCollationTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_collation") do
-        with_stubbed_new do
-          assert_called(eval("@#{v}"), :collation) do
-            ActiveRecord::Tasks::DatabaseTasks.collation "adapter" => k
-          end
-        end
-      end
     end
   end
 
@@ -1072,41 +962,6 @@ module ActiveRecord
       assert_nothing_raised { ActiveRecord::Tasks::DatabaseTasks.check_target_version }
     ensure
       ENV["VERSION"] = version
-    end
-  end
-
-  class LegacyDatabaseTasksStructureDumpTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_structure_dump") do
-        with_stubbed_new do
-          assert_called_with(
-            eval("@#{v}"), :structure_dump,
-            ["awesome-file.sql", nil]
-          ) do
-            ActiveRecord::Tasks::DatabaseTasks.structure_dump({ "adapter" => k }, "awesome-file.sql")
-          end
-        end
-      end
-    end
-  end
-
-  class LegacyDatabaseTasksStructureLoadTest < ActiveRecord::TestCase
-    include DatabaseTasksSetupper
-
-    ADAPTERS_TASKS.each do |k, v|
-      define_method("test_#{k}_structure_load") do
-        with_stubbed_new do
-          assert_called_with(
-            eval("@#{v}"),
-            :structure_load,
-            ["awesome-file.sql", nil]
-          ) do
-            ActiveRecord::Tasks::DatabaseTasks.structure_load({ "adapter" => k }, "awesome-file.sql")
-          end
-        end
-      end
     end
   end
 
