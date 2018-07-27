@@ -6,10 +6,10 @@ module ActiveRecord
       @configurations = format_configs(configurations)
     end
 
-    attr_accessor :configurations
+    attr_reader :configurations
 
     def default_config(env)
-      default = configurations.find { |db_config| db_config.env_name == env }
+      default = select_db_config(env)
       default.config if default
     end
 
@@ -20,24 +20,25 @@ module ActiveRecord
       end
     end
 
-    def config_for_env_and_spec(environment, specification_name)
-      configs_for(environment).find do |db_config|
-        db_config.spec_name == specification_name
-      end
-    end
-
-    # Collects the configs for the environment passed in.
+    # Collects the configs for the environment and optionally the specification
+    # name passed in.
     #
-    # If a block is given returns the specification name and configuration
-    # otherwise returns an array of DatabaseConfig structs for the environment.
-    def configs_for(env, &blk)
+    # If a spec name is provided a single DatabaseConfiguration object will be
+    # returned. If a spec name is not passed and a block is passed the specification
+    # name and configuration hash will be returned. Otherwise an array with all the
+    # DatabaseConfiguration objects will be returned.
+    def configs_for(env, spec = nil, &blk)
       configs = configurations
 
       env_with_configs = configs.select do |db_config|
         db_config.env_name == env
       end
 
-      if block_given?
+      if spec
+        env_with_configs.find do |db_config|
+          db_config.spec_name == spec
+        end
+      elsif block_given?
         env_with_configs.each do |env_with_config|
           yield env_with_config.spec_name, env_with_config.config
         end
@@ -45,7 +46,6 @@ module ActiveRecord
         env_with_configs
       end
     end
-    alias :[] :configs_for
 
     def format_configs(configs)
       return configs if configs.is_a?(Array)

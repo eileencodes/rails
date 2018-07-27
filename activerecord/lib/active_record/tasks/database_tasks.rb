@@ -117,7 +117,7 @@ module ActiveRecord
         if options.has_key?(:config)
           @current_config = options[:config]
         else
-          @current_config ||= ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(options[:env], options[:spec]).config
+          @current_config ||= ActiveRecord::Base.configurations(legacy: false).configs_for(options[:env], options[:spec]).config
         end
       end
 
@@ -208,7 +208,7 @@ module ActiveRecord
       end
 
       def charset_current(environment = env, specification_name = spec)
-        charset ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(environment, specification_name).config
+        charset ActiveRecord::Base.configurations(legacy: false).configs_for(environment, specification_name).config
       end
 
       def charset(*arguments)
@@ -217,7 +217,7 @@ module ActiveRecord
       end
 
       def collation_current(environment = env, specification_name = spec)
-        collation ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(environment, specification_name).config
+        collation ActiveRecord::Base.configurations(legacy: false).configs_for(environment, specification_name).config
       end
 
       def collation(*arguments)

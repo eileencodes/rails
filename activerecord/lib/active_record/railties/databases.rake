@@ -26,7 +26,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Create #{spec_name} database for current environment"
       task spec_name => :load_config do
-        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env, spec_name)
         ActiveRecord::Tasks::DatabaseTasks.create(db_config.config)
       end
     end
@@ -45,7 +45,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Drop #{spec_name} database for current environment"
       task spec_name => [:load_config, :check_protected_environments] do
-        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env, spec_name)
         ActiveRecord::Tasks::DatabaseTasks.drop(db_config.config)
       end
     end
@@ -99,7 +99,7 @@ db_namespace = namespace :db do
     ActiveRecord::Tasks::DatabaseTasks.for_each do |spec_name|
       desc "Migrate #{spec_name} database for current environment"
       task spec_name => :load_config do
-        db_config = ActiveRecord::Base.configurations(legacy: false).config_for_env_and_spec(Rails.env, spec_name)
+        db_config = ActiveRecord::Base.configurations(legacy: false).configs_for(Rails.env, spec_name)
         ActiveRecord::Base.establish_connection(db_config.config)
         ActiveRecord::Tasks::DatabaseTasks.migrate
       end
