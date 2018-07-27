@@ -58,6 +58,7 @@ module ActiveRecord
           @@configurations = ActiveRecord::ConnectionHandling::MergeAndResolveDefaultUrlConfig.new(formatted_configs).configs
         end
       end
+      self.configurations = {}
 
       # Returns fully resolved configurations hash
       def self.configurations(legacy: true)
@@ -69,8 +70,6 @@ module ActiveRecord
           @@configurations
         end
       end
-
-      self.configurations = {}
 
       ##
       # :singleton-method:
