@@ -3,11 +3,7 @@
 module ActiveRecord
   class DatabaseConfigurations
     def initialize(configurations = [])
-      if configurations.is_a?(Array)
-        @configurations = configurations
-      else
-        @configurations = format_configs(configurations)
-      end
+      @configurations = format_configs(configurations)
     end
 
     attr_accessor :configurations
@@ -51,6 +47,20 @@ module ActiveRecord
     end
     alias :[] :configs_for
 
+    def format_configs(configs)
+      return configs if configs.is_a?(Array)
+
+      db_configs = configs.each_pair.flat_map do |env_name, config|
+        walk_configs(env_name, "primary", config)
+      end.compact
+
+      if url = ENV["DATABASE_URL"]
+        url_configs(url, db_configs)
+      else
+        db_configs
+      end
+    end
+
     # Walks all the configs passed in and returns an array
     # of DatabaseConfig structs for each configuration.
     def walk_configs(env_name, spec_name, config)
@@ -90,18 +100,6 @@ module ActiveRecord
             end
           end
         end
-      end
-    end
-
-    def format_configs(configs)
-      db_configs = configs.each_pair.flat_map do |env_name, config|
-        walk_configs(env_name, "primary", config)
-      end.compact
-
-      if url = ENV["DATABASE_URL"]
-        url_configs(url, db_configs)
-      else
-        db_configs
       end
     end
 
