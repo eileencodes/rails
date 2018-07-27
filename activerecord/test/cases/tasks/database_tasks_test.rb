@@ -625,9 +625,6 @@ module ActiveRecord
     end
 
     def test_drops_current_environment_database_with_url
-      @old_configs = ActiveRecord::Base.configurations(legacy: false)
-      ActiveRecord::Base.configurations = @configurations
-
       ActiveRecord::Base.configurations(legacy: false) do
         assert_called_with(
           ActiveRecord::Tasks::DatabaseTasks,
@@ -642,8 +639,6 @@ module ActiveRecord
           )
         end
       end
-    ensure
-      ActiveRecord::Base.configurations = @old_configs
     end
 
     def test_drops_test_and_development_databases_when_env_was_not_specified
