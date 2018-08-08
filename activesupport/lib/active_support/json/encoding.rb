@@ -2,6 +2,7 @@
 
 require "active_support/core_ext/object/json"
 require "active_support/core_ext/module/delegation"
+require "yajl"
 
 module ActiveSupport
   class << self
@@ -22,8 +23,18 @@ module ActiveSupport
       Encoding.json_encoder.new(options).encode(value)
     end
 
-    module Encoding #:nodoc:
-      class JSONGemEncoder #:nodoc:
+    module Encoding # :nodoc:
+      class YajlGemEncoder # :nodoc:
+        def initialize(options)
+          @options = options
+        end
+
+        def encode(value)
+          Yajl.dump(value)
+        end
+      end
+
+      class JSONGemEncoder # :nodoc:
         attr_reader :options
 
         def initialize(options = nil)
@@ -127,7 +138,7 @@ module ActiveSupport
 
       self.use_standard_json_time_format = true
       self.escape_html_entities_in_json  = true
-      self.json_encoder = JSONGemEncoder
+      self.json_encoder = YajlGemEncoder
       self.time_precision = 3
     end
   end

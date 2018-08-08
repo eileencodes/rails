@@ -9,6 +9,10 @@ gemspec
 # We need a newish Rake since Active Job sets its test tasks' descriptions.
 gem "rake", ">= 11.1"
 
+gem "yajl-ruby"
+
+gem "mocha"
+
 gem "capybara", ">= 2.15"
 
 gem "rack-cache", "~> 1.2"
