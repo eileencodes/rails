@@ -110,26 +110,6 @@ module ActiveRecord
       end
 
       ##
-      ## Builds a hash config to maintain backwards compatability.
-      class LegacyResolver # :nodoc:
-        attr_reader :configurations
-
-        # Accepts a list of db config objects.
-        def initialize(configurations)
-          @configurations = configurations
-        end
-
-        # Expands each key in @configurations hash into fully resolved hash
-        def resolve_all
-          configs = configurations.inject({}) do |memo, db_config|
-            memo.merge(db_config.to_legacy_hash)
-          end
-
-          configs
-        end
-      end
-
-      ##
       # Builds a ConnectionSpecification from user input.
       class Resolver # :nodoc:
         attr_reader :configurations

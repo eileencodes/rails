@@ -4,15 +4,92 @@ require "cases/helper"
 require "active_record/tasks/database_tasks"
 
 module ActiveRecord
+  class LegacyDatabaseTasksUtilsTask < ActiveRecord::TestCase
+    def test_raises_an_error_when_called_with_protected_environment
+      ActiveRecord::MigrationContext.any_instance.stubs(:current_version).returns(1)
+
+      protected_environments = ActiveRecord::Base.protected_environments
+      current_env            = ActiveRecord::Base.connection.migration_context.current_environment
+      assert_not_includes protected_environments, current_env
+      # Assert no error
+      ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+
+      ActiveRecord::Base.protected_environments = [current_env]
+
+      assert_raise(ActiveRecord::ProtectedEnvironmentError) do
+        ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+      end
+    ensure
+      ActiveRecord::Base.protected_environments = protected_environments
+    end
+
+    def test_raises_an_error_when_called_with_protected_environment_which_name_is_a_symbol
+      ActiveRecord::MigrationContext.any_instance.stubs(:current_version).returns(1)
+
+      protected_environments = ActiveRecord::Base.protected_environments
+      current_env            = ActiveRecord::Base.connection.migration_context.current_environment
+      assert_not_includes protected_environments, current_env
+      # Assert no error
+      ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+
+      ActiveRecord::Base.protected_environments = [current_env.to_sym]
+      assert_raise(ActiveRecord::ProtectedEnvironmentError) do
+        ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+      end
+    ensure
+      ActiveRecord::Base.protected_environments = protected_environments
+    end
+
+    def test_raises_an_error_if_no_migrations_have_been_made
+      ActiveRecord::InternalMetadata.stub(:table_exists?, false) do
+        ActiveRecord::MigrationContext.any_instance.stubs(:current_version).returns(1)
+
+        assert_raise(ActiveRecord::NoEnvironmentInSchemaError) do
+          ActiveRecord::Tasks::DatabaseTasks.check_protected_environments!
+        end
+      end
+    end
+  end
+
+  class LegacyDatabaseTasksRegisterTask < ActiveRecord::TestCase
+    def test_register_task
+      klazz = Class.new do
+        def initialize(*arguments); end
+        def structure_dump(filename); end
+      end
+      instance = klazz.new
+
+      klazz.stub(:new, instance) do
+        assert_called_with(instance, :structure_dump, ["awesome-file.sql", nil]) do
+          ActiveRecord::Tasks::DatabaseTasks.register_task(/foo/, klazz)
+          ActiveRecord::Tasks::DatabaseTasks.structure_dump({ "adapter" => :foo }, "awesome-file.sql")
+        end
+      end
+    end
+
+    def test_unregistered_task
+      assert_raise(ActiveRecord::Tasks::DatabaseNotSupported) do
+        ActiveRecord::Tasks::DatabaseTasks.structure_dump({ "adapter" => :bar }, "awesome-file.sql")
+      end
+    end
+  end
+
+  class LegacyDatabaseTasksDumpSchemaCacheTest < ActiveRecord::TestCase
+    def test_dump_schema_cache
+      path = "/tmp/my_schema_cache.yml"
+      ActiveRecord::Tasks::DatabaseTasks.dump_schema_cache(ActiveRecord::Base.connection, path)
+      assert File.file?(path)
+    ensure
+      ActiveRecord::Base.clear_cache!
+      FileUtils.rm_rf(path)
+    end
+  end
+
   class LegacyDatabaseTasksCreateAllTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
-
       @configurations = { "development" => { "database" => "my-db" } }
 
       $stdout, @original_stdout = StringIO.new, $stdout
@@ -23,7 +100,6 @@ module ActiveRecord
 
     def teardown
       $stdout, $stderr = @original_stdout, @original_stderr
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -103,9 +179,6 @@ module ActiveRecord
 
   class LegacyDatabaseTasksCreateCurrentTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
@@ -120,7 +193,6 @@ module ActiveRecord
     end
 
     def teardown
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -212,9 +284,6 @@ module ActiveRecord
 
   class LegacyDatabaseTasksCreateCurrentThreeTierTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
@@ -229,7 +298,6 @@ module ActiveRecord
     end
 
     def teardown
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -335,9 +403,6 @@ module ActiveRecord
 
   class LegacyDatabaseTasksDropAllTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
@@ -351,7 +416,6 @@ module ActiveRecord
 
     def teardown
       $stdout, $stderr = @original_stdout, @original_stderr
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -419,13 +483,9 @@ module ActiveRecord
 
   class LegacyDatabaseTasksDropCurrentTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
-
       @configurations = {
         "development" => { "database" => "dev-db" },
         "test"        => { "database" => "test-db" },
@@ -436,7 +496,6 @@ module ActiveRecord
     end
 
     def teardown
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -512,13 +571,9 @@ module ActiveRecord
 
   class LegacyDatabaseTasksDropCurrentThreeTierTest < ActiveRecord::TestCase
     def setup
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
-
       @configurations = {
         "development" => { "primary" => { "database" => "dev-db" }, "secondary" => { "database" => "secondary-dev-db" } },
         "test" => { "primary" => { "database" => "test-db" }, "secondary" => { "database" => "secondary-test-db" } },
@@ -529,7 +584,6 @@ module ActiveRecord
     end
 
     def teardown
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
 
@@ -756,13 +810,9 @@ module ActiveRecord
 
   class LegacyDatabaseTasksPurgeCurrentTest < ActiveRecord::TestCase
     def test_purges_current_environment_database
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
-
       configurations = {
         "development" => { "database" => "dev-db" },
         "test"        => { "database" => "test-db" },
@@ -785,22 +835,16 @@ module ActiveRecord
         end
       end
     ensure
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
   end
 
   class LegacyDatabaseTasksPurgeAllTest < ActiveRecord::TestCase
     def test_purge_all_local_configurations
-      @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-      ActiveRecord::Base.use_legacy_configurations = true
-
       assert_deprecated do
         @old_configurations = ActiveRecord::Base.configurations
       end
-
       configurations = { development: { "database" => "my-db" } }
-
       ActiveRecord::Base.configurations = configurations
 
       assert_deprecated do
@@ -815,7 +859,6 @@ module ActiveRecord
         end
       end
     ensure
-      ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       ActiveRecord::Base.configurations = @old_configurations
     end
   end

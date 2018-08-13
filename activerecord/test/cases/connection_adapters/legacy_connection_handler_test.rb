@@ -11,19 +11,12 @@ module ActiveRecord
       fixtures :people
 
       def setup
-        @old_config_setting = ActiveRecord::Base.use_legacy_configurations
-        ActiveRecord::Base.use_legacy_configurations = true
-
         @handler = ConnectionHandler.new
         @spec_name = "primary"
         config = assert_deprecated do
           ActiveRecord::Base.configurations["arunit"]
         end
         @pool = @handler.establish_connection(config)
-      end
-
-      def teardown
-        ActiveRecord::Base.use_legacy_configurations = @old_config_setting
       end
 
       def test_default_env_fall_back_to_default_env_when_rails_env_or_rack_env_is_empty_string

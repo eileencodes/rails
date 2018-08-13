@@ -24,8 +24,6 @@ module ActiveRecord
       # their relevant queries. Defaults to false.
       mattr_accessor :verbose_query_logs, instance_writer: false, default: false
 
-      mattr_accessor :use_legacy_configurations, instance_accessor: false, default: false
-
       ##
       # Contains the database configuration - as is typically stored in config/database.yml -
       # as a Hash.
@@ -58,11 +56,11 @@ module ActiveRecord
       self.configurations = {}
 
       # Returns fully resolved configurations hash
-      def self.configurations(legacy: ActiveRecord::Base.use_legacy_configurations)
+      def self.configurations(legacy: true)
         if legacy
           ActiveSupport::Deprecation.warn \
             "Returning a hash of configs from ActiveRecord::Base.configurations is deprecated. In Rails 6.1 it will return an array of objects. To use the new behavior please add `legacy: false` to your `configurations call."
-          ConnectionAdapters::ConnectionSpecification::LegacyResolver.new(@@configurations.configurations).resolve_all
+          @@configurations.to_h
         else
           @@configurations
         end

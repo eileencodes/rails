@@ -18,8 +18,8 @@ module ActiveRecord
       end
 
       def resolve_config(config)
-        configs = ActiveRecord::DatabaseConfigurations.new(config).configurations
-        ConnectionAdapters::ConnectionSpecification::LegacyResolver.new(configs).resolve_all
+        configs = ActiveRecord::DatabaseConfigurations.new(config)
+        configs.to_h
       end
 
       def resolve_spec(spec, config)

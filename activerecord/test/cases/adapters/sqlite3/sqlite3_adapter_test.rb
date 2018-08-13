@@ -483,13 +483,9 @@ module ActiveRecord
       end
 
       def test_statement_closed_legacy
-        old_config_setting = ActiveRecord::Base.use_legacy_configurations
-        ActiveRecord::Base.use_legacy_configurations = true
-
         config = assert_deprecated do
           ActiveRecord::Base.configurations["arunit"]["database"]
         end
-
         db = ::SQLite3::Database.new(config)
         statement = ::SQLite3::Statement.new(db,
                                            "CREATE TABLE statement_test (number integer not null)")
@@ -504,8 +500,6 @@ module ActiveRecord
             end
           end
         end
-      ensure
-        ActiveRecord::Base.use_legacy_configurations = old_config_setting
       end
 
       def test_statement_closed

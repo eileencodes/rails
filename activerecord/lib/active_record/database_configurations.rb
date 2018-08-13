@@ -20,6 +20,14 @@ module ActiveRecord
       end
     end
 
+    def to_h
+      configs = configurations.inject({}) do |memo, db_config|
+        memo.merge(db_config.to_legacy_hash)
+      end
+
+      configs
+    end
+
     # Collects the configs for the environment and optionally the specification
     # name passed in.
     #
