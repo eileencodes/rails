@@ -46,12 +46,19 @@ module ActiveRecord
     #
     # The exceptions AdapterNotSpecified, AdapterNotFound and +ArgumentError+
     # may be returned on an error.
-    def establish_connection(config_or_env = nil)
+    def establish_connection(config_or_env = nil, mode = :default)
       raise "Anonymous class is not allowed." unless name
 
       config_or_env ||= DEFAULT_ENV.call.to_sym
       pool_name = self == Base ? "primary" : name
-      self.connection_specification_name = pool_name
+
+      # would create a name like AnimalsBase.readonly
+      pool_name += ".#{mode.to_s}" unless mode == :default
+
+      @connection_names ||= {}
+      @connection_names[mode] = pool_name
+
+      self.connection_specification_name = pool_name if mode == :default
 
       resolver = ConnectionAdapters::ConnectionSpecification::Resolver.new(Base.configurations)
       config_hash = resolver.resolve(config_or_env, pool_name).symbolize_keys
@@ -68,12 +75,28 @@ module ActiveRecord
     end
 
     attr_writer :connection_specification_name
+    attr_accessor :current_connection_mode # FIXME: Make this thread-local
+
+    def use_default_connection(&blk)
+      use_connection(:default, &blk)
+    end
+
+    def use_readonly_connection(&blk)
+      use_connection(:readonly, &blk)
+    end
 
     # Return the specification name from the current class or its parent.
-    def connection_specification_name
-      if !defined?(@connection_specification_name) || @connection_specification_name.nil?
-        return self == Base ? "primary" : superclass.connection_specification_name
+    def connection_specification_name(mode = nil)
+      mode ||= current_connection_mode
+
+      if defined?(@connection_names) && @connection_names.key?(mode || :default)
+        return @connection_names[mode || :default]
       end
+
+      if !defined?(@connection_specification_name) || @connection_specification_name.nil?
+        return self == Base ? "primary" : superclass.connection_specification_name(mode)
+      end
+
       @connection_specification_name
     end
 
@@ -118,5 +141,14 @@ module ActiveRecord
 
     delegate :clear_active_connections!, :clear_reloadable_connections!,
       :clear_all_connections!, :flush_idle_connections!, to: :connection_handler
+
+    private
+
+      def use_connection(mode, &blk)
+        previous, self.current_connection_mode = self.current_connection_mode, mode
+        yield
+      ensure
+        self.current_connection_mode = previous
+      end
   end
 end
