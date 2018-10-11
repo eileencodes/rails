@@ -154,6 +154,8 @@ class Array
   end
 end
 
+# to json takes options and passes them into everything
+# that rsponds to to_json
 class Hash
   def as_json(options = nil) #:nodoc:
     # create a subset of the hash by applying :only or :except

@@ -9,7 +9,7 @@ gemspec
 # We need a newish Rake since Active Job sets its test tasks' descriptions.
 gem "rake", ">= 11.1"
 
-gem "yajl-ruby"
+gem "yajl-ruby", path: "/Users/eileencodes/open_source/yajl-ruby"
 
 gem "mocha"
 
