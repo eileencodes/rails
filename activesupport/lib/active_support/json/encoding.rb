@@ -30,7 +30,7 @@ module ActiveSupport
         end
 
         def encode(value)
-          Yajl.dump(value)
+          Yajl.dump(value, as_json: @options)
         end
       end
 
