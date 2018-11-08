@@ -166,6 +166,30 @@ class TestJSONEncoding < ActiveSupport::TestCase
     assert_equal({ "foo" => { "foo" => "hello" } }, JSON.parse(json))
   end
 
+  class Bar
+    def as_json(options = nil)
+      if options
+        options
+      else
+        "bar"
+      end
+    end
+  end
+
+  class Foo
+    def initialize bar
+      @bar = bar
+    end
+
+    def as_json(options = nil)
+      [@bar]
+    end
+  end
+
+  def test_as_json_options_arent_always_passed_to_at_json
+    assert_equal ["bar"], JSON.parse(ActiveSupport::JSON.encode(Foo.new(Bar.new), only: [:lolol]))
+    assert_equal({"only"=>["lolol"]}, JSON.parse(ActiveSupport::JSON.encode(Bar.new, only: [:lolol])))
+  end
 
   def test_hash_should_pass_encoding_options_to_children_in_as_json
     person = {
