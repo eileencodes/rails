@@ -150,8 +150,15 @@ end
 
 class Array
   def as_json(options = nil) #:nodoc:
-    p options
-    map { |v| options ? v.as_json(options.dup) : v.as_json }
+    if options
+      map { |v|
+        # v is a hash
+        # opotions is { only: [:address, :city] }
+        v.as_json(options.dup)
+      }
+    else
+      map { |v| v.as_json }
+    end
   end
 end
 
@@ -159,6 +166,12 @@ end
 # that rsponds to to_json
 class Hash
   def as_json(options = nil) #:nodoc:
+    if self == {"address"=>{"city"=>"London"}}
+      p self => options # should be { only: [:address, :city] }
+      puts "#" * 90
+      puts caller
+      puts "#" * 90
+    end
     # create a subset of the hash by applying :only or :except
     subset = if options
       if attrs = options[:only]
