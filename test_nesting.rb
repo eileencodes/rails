@@ -18,5 +18,8 @@ class Foo
 end
 
 # Options isn't passed to bar
-p ActiveSupport::JSON.encode(Foo.new(Bar.new), neat: [:lolol])
+p a: ActiveSupport::JSON.encode(Foo.new(Bar.new), neat: [:lolol])
+p b: ActiveSupport::JSON.encode(Bar.new, neat: [:lolol]) # should be passed to bar
+p c: ActiveSupport::JSON.encode([Bar.new], neat: [:lolol]) # should be passed to bar
+p d: ActiveSupport::JSON.encode({ "x" => Bar.new}, neat: [:lolol]) # should be passed to bar
 
