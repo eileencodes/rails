@@ -255,6 +255,22 @@ class RelationTest < ActiveRecord::TestCase
     assert_equal topics(:first).title, topics.first.title
   end
 
+  if current_adapter?(:SQLite3Adapter)
+    def test_pluck_with_subquery_with_as_uses_original_table_name
+      relation = Company.joins(:contracts).order(:id)
+      subquery = Company.from("#{Company.quoted_table_name} INDEXED BY company_index").joins(:contracts).order(:id)
+      assert_equal relation.pluck(:id), subquery.pluck(:id)
+    end
+  end
+
+  if current_adapter?(:Mysql2Adapter)
+    def test_pluck_with_subquery_with_as_uses_original_table_name
+      relation = Company.joins(:contracts).order(:id)
+      subquery = Company.from("#{Company.quoted_table_name} USE INDEX (company_index)").joins(:contracts).order(:id)
+      assert_equal relation.pluck(:id), subquery.pluck(:id)
+    end
+  end
+
   def test_finding_with_arel_order
     topics = Topic.order(Topic.arel_table[:id].asc)
     assert_equal 5, topics.to_a.size
