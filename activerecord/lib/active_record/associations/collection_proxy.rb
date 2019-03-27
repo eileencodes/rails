@@ -723,7 +723,8 @@ module ActiveRecord
       end
 
       def pluck(*column_names)
-        null_scope? ? scope.pluck(*column_names) : super
+        return super if in_memory_pluck?(column_names)
+        @association.pluck(*column_names)
       end
 
       ##

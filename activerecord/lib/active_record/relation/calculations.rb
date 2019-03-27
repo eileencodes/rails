@@ -179,7 +179,7 @@ module ActiveRecord
     # See also #ids.
     #
     def pluck(*column_names)
-      if loaded? && (column_names.map(&:to_s) - @klass.attribute_names - @klass.attribute_aliases.keys).empty?
+      if in_memory_pluck?(column_names)
         return records.pluck(*column_names)
       end
 
@@ -222,6 +222,11 @@ module ActiveRecord
     end
 
     private
+
+      def in_memory_pluck?(column_names)
+        loaded? && (column_names.map(&:to_s) - @klass.attribute_names - @klass.attribute_aliases.keys).empty?
+      end
+
       def has_include?(column_name)
         eager_loading? || (includes_values.present? && column_name && column_name != :all)
       end

@@ -10,6 +10,10 @@ module ActiveRecord
     class HasManyAssociation < CollectionAssociation #:nodoc:
       include ForeignAssociation
 
+      def pluck(*column_names)
+        scope.pluck(*column_names)
+      end
+
       def handle_dependency
         case options[:dependent]
         when :restrict_with_exception
