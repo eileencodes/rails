@@ -5,6 +5,8 @@ require "active_model/attribute"
 module ActiveRecord
   class Relation
     class QueryAttribute < ActiveModel::Attribute # :nodoc:
+      def bind_parameter?; true; end
+
       def type_cast(value)
         value
       end

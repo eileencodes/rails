@@ -31,6 +31,10 @@ module Arel # :nodoc: all
       def unboundable?
         value.respond_to?(:unboundable?) && value.unboundable?
       end
+
+      def bind_parameter?
+        true
+      end
     end
   end
 end
