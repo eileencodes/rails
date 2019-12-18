@@ -14,6 +14,15 @@ module Arel # :nodoc: all
         [self.class, self.value].hash
       end
 
+      def self.===(value)
+        raise "this is a triple equality"
+      end
+
+      def is_a?(value)
+        raise "this is a is_a?" if value == Arel::Nodes::BindParam
+        super
+      end
+
       def eql?(other)
         other.is_a?(BindParam) &&
           value == other.value

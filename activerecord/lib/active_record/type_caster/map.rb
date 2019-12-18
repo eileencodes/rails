@@ -8,7 +8,7 @@ module ActiveRecord
       end
 
       def type_cast_for_database(attr_name, value)
-        return value if value.respond_to?(:bind_parameter?)
+        #return value if value.respond_to?(:bind_parameter?)
         type = types.type_for_attribute(attr_name)
         type.serialize(value)
       end

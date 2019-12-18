@@ -7,6 +7,15 @@ module ActiveRecord
     class QueryAttribute < ActiveModel::Attribute # :nodoc:
       def bind_parameter?; true; end
 
+      def self.===(value)
+        raise "this is a triple equality"
+      end
+
+      def is_a?(value)
+        raise "this is a is_a?" if value == Arel::Nodes::BindParam
+        super
+      end
+
       def type_cast(value)
         value
       end

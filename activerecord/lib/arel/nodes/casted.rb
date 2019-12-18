@@ -34,8 +34,12 @@ module Arel # :nodoc: all
     end
 
     def self.build_quoted(other, attribute = nil)
+      if other.respond_to?(:bind_param?)
+        return other
+      end
+
       case other
-      when Arel::Nodes::Node, Arel::Attributes::Attribute, Arel::Table, Arel::Nodes::BindParam, Arel::SelectManager, Arel::Nodes::Quoted, Arel::Nodes::SqlLiteral
+      when Arel::Nodes::Node, Arel::Attributes::Attribute, Arel::Table, Arel::SelectManager, Arel::Nodes::Quoted, Arel::Nodes::SqlLiteral
         other
       else
         case attribute

@@ -105,11 +105,15 @@ module Arel # :nodoc: all
             collector << "("
             row.each_with_index do |value, k|
               collector << ", " unless k == 0
-              case value
-              when Nodes::SqlLiteral, Nodes::BindParam
+              if value.respond_to?(:bind_param?)
                 collector = visit(value, collector)
               else
-                collector << quote(value).to_s
+                case value
+                when Nodes::SqlLiteral
+                  collector = visit(value, collector)
+                else
+                  collector << quote(value).to_s
+                end
               end
             end
             collector << ")"
@@ -698,6 +702,7 @@ module Arel # :nodoc: all
 
         alias :visit_Arel_Nodes_SqlLiteral :literal
         alias :visit_Integer               :literal
+        alias :visit_ActiveRecord_Relation_QueryAttribute :visit_Arel_Nodes_BindParam
 
         def quoted(o, a)
           if a && a.able_to_type_cast?
