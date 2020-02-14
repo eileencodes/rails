@@ -1213,7 +1213,18 @@ module ActiveRecord
 
           pool_name = db_config.owner_name || Base.name
           db_config.owner_name = nil
-          ConnectionAdapters::PoolConfig.new(pool_name, db_config)
+          pool_config = ConnectionAdapters::PoolConfig.new(pool_name, db_config)
+          setup_connection_pool_schema_cache(pool_config)
+          pool_config
+        end
+
+        def setup_connection_pool_schema_cache(pool_config)
+          db_config = pool_config.db_config
+          path = db_config.schema_cache_path
+          filename = ActiveRecord::Tasks::DatabaseTasks.cache_dump_filename(db_config.spec_name, schema_cache_path: path)
+          cache = ActiveRecord::ConnectionAdapters::SchemaCache.load_from(filename)
+
+          pool_config.schema_cache = cache
         end
     end
   end
