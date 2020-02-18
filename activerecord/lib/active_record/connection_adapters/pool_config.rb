@@ -5,8 +5,7 @@ module ActiveRecord
     class PoolConfig # :nodoc:
       include Mutex_m
 
-      attr_reader :db_config, :connection_specification_name
-      attr_accessor :schema_cache
+      attr_reader :db_config, :connection_specification_name, :schema_cache
 
       INSTANCES = ObjectSpace::WeakMap.new
       private_constant :INSTANCES
@@ -22,6 +21,7 @@ module ActiveRecord
         @connection_specification_name = connection_specification_name
         @db_config = db_config
         @pool = nil
+        @schema_cache = setup_schema_cache
         INSTANCES[self] = self
       end
 
@@ -38,6 +38,13 @@ module ActiveRecord
         end
 
         nil
+      end
+
+      def setup_schema_cache
+        path = db_config.schema_cache_path
+        filename = ActiveRecord::Tasks::DatabaseTasks.cache_dump_filename(db_config.spec_name, schema_cache_path: path)
+        p filename
+        ActiveRecord::ConnectionAdapters::SchemaCache.load_from(filename)
       end
 
       def pool

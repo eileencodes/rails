@@ -110,6 +110,8 @@ module ActiveRecord
       # custom list.
       mattr_accessor :dump_schemas, instance_writer: false, default: :schema_search_path
 
+      mattr_accessor :load_schema_cache_on_connection, instance_writer: false, default: false
+
       ##
       # :singleton-method:
       # Specify a threshold for the size of query result sets. If the number of

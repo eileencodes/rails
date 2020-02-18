@@ -92,6 +92,9 @@ module ActiveRecord
       # If omitted, the filename will be read from ENV or a
       # default will be derived.
       def schema_cache_path
+        # check the config option
+        #   assume that htere's db/schema.yml
+        #   otherwise force you to set it in order to load
         configuration_hash[:schema_cache_path]
       end
     end

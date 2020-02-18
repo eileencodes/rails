@@ -126,30 +126,39 @@ To keep using the current cache store, you can turn off cache versioning entirel
     end
 
     initializer "active_record.check_schema_cache_dump" do
-      if config.active_record.delete(:use_schema_cache_dump)
-        config.after_initialize do |app|
-          ActiveSupport.on_load(:active_record) do
-            db_config = ActiveRecord::Base.configurations.configs_for(
-              env_name: Rails.env,
-              spec_name: "primary",
-            )
-            filename = ActiveRecord::Tasks::DatabaseTasks.cache_dump_filename(
-              "primary",
-              schema_cache_path: db_config&.schema_cache_path,
-            )
+      if config.active_record.delete(:load_schema_cache_on_connection)
+        p "hi! using pool cache"
+        config.active_record.delete(:use_schema_cache_dump)
+        next
+      end
 
-            cache = ActiveRecord::ConnectionAdapters::SchemaCache.load_from(filename)
-            next if cache.nil?
+      if use_schema_cache_dump = config.active_record.delete(:use_schema_cache_dump)
+        if use_schema_cache_dump || use_schema_cache_dump && defined?(ENGINE_ROOT) && engine = Rails::Engine.find(ENGINE_ROOT)
+          p "hi i am not loaded"
+          config.after_initialize do |app|
+            ActiveSupport.on_load(:active_record) do
+              db_config = ActiveRecord::Base.configurations.configs_for(
+                env_name: Rails.env,
+                spec_name: "primary",
+              )
+              filename = ActiveRecord::Tasks::DatabaseTasks.cache_dump_filename(
+                "primary",
+                schema_cache_path: db_config&.schema_cache_path,
+              )
 
-            current_version = ActiveRecord::Migrator.current_version
-            next if current_version.nil?
+              cache = ActiveRecord::ConnectionAdapters::SchemaCache.load_from(filename)
+              next if cache.nil?
 
-            if cache.version != current_version
-              warn "Ignoring #{filename} because it has expired. The current schema version is #{current_version}, but the one in the cache is #{cache.version}."
-              next
+              current_version = ActiveRecord::Migrator.current_version
+              next if current_version.nil?
+
+              if cache.version != current_version
+                warn "Ignoring #{filename} because it has expired. The current schema version is #{current_version}, but the one in the cache is #{cache.version}."
+                next
+              end
+
+              connection_pool.set_schema_cache(cache.dup)
             end
-
-            connection_pool.set_schema_cache(cache.dup)
           end
         end
       end
