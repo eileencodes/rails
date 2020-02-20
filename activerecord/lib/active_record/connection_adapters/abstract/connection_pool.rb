@@ -1063,6 +1063,12 @@ module ActiveRecord
         message_bus.instrument("!connection.active_record", payload) do
           pool_config.pool
         end
+
+        if ActiveRecord::Base.load_schema_cache_on_connection
+          pool_config.setup_schema_cache
+        end
+
+        pool_config.pool
       end
 
       # Returns true if there are any active connections among the connection

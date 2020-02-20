@@ -6,6 +6,7 @@ module ActiveRecord
       include Mutex_m
 
       attr_reader :db_config, :connection_specification_name, :schema_cache
+      attr_writer :schema_cache
 
       INSTANCES = ObjectSpace::WeakMap.new
       private_constant :INSTANCES
@@ -21,7 +22,6 @@ module ActiveRecord
         @connection_specification_name = connection_specification_name
         @db_config = db_config
         @pool = nil
-        @schema_cache = setup_schema_cache
         INSTANCES[self] = self
       end
 
@@ -41,10 +41,17 @@ module ActiveRecord
       end
 
       def setup_schema_cache
-        path = db_config.schema_cache_path
-        filename = ActiveRecord::Tasks::DatabaseTasks.cache_dump_filename(db_config.spec_name, schema_cache_path: path)
-        p filename
-        ActiveRecord::ConnectionAdapters::SchemaCache.load_from(filename)
+        cache = ActiveRecord::ConnectionAdapters::SchemaCache.load_from(db_config.schema_cache_path)
+        return if cache.nil?
+
+        current_version = @pool.connection.migration_context.current_version
+        return if current_version.nil?
+
+        if cache.version != current_version
+          warn "Ignoring #{db_config.schema_cache_path} because it has expired. The current schema version is #{current_version}, but the one in the cache is #{cache.version}."
+        else
+         @schema_cache = cache
+        end
       end
 
       def pool

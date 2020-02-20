@@ -92,10 +92,15 @@ module ActiveRecord
       # If omitted, the filename will be read from ENV or a
       # default will be derived.
       def schema_cache_path
-        # check the config option
-        #   assume that htere's db/schema.yml
-        #   otherwise force you to set it in order to load
-        configuration_hash[:schema_cache_path]
+        configuration_hash.fetch(:schema_cache_path) do
+          if ENV["SCHEMA_CACHE"]
+            ENV["SCHEMA_CACHE"]
+          elsif spec_name != "primary"
+            "db/#{spec_name}_schema_cache.yml"
+          else
+            "db/schema_cache.yml"
+          end
+        end
       end
     end
   end

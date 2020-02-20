@@ -126,15 +126,13 @@ To keep using the current cache store, you can turn off cache versioning entirel
     end
 
     initializer "active_record.check_schema_cache_dump" do
-      if config.active_record.delete(:load_schema_cache_on_connection)
-        p "hi! using pool cache"
+      if config.active_record.load_schema_cache_on_connection
         config.active_record.delete(:use_schema_cache_dump)
         next
       end
 
       if use_schema_cache_dump = config.active_record.delete(:use_schema_cache_dump)
         if use_schema_cache_dump || use_schema_cache_dump && defined?(ENGINE_ROOT) && engine = Rails::Engine.find(ENGINE_ROOT)
-          p "hi i am not loaded"
           config.after_initialize do |app|
             ActiveSupport.on_load(:active_record) do
               db_config = ActiveRecord::Base.configurations.configs_for(
