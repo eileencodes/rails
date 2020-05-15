@@ -15,6 +15,24 @@ module ActionDispatch
         @cache  = nil
       end
 
+      class ThreeThingObject
+        attr_reader :params
+
+        def initialize(route, parameterized_parts, params)
+          @route = route
+          @parameterized_parts = parameterized_parts
+          @params = params
+        end
+
+        def path
+          @route.format(@parameterized_parts)
+        end
+
+        def to_ary
+          [path, params]
+        end
+      end
+
       def generate(name, options, path_parameters, method_name = nil)
         constraints = path_parameters.merge(options)
         missing_keys = nil
@@ -44,7 +62,7 @@ module ActionDispatch
             parameterized_parts.delete(key)
           end
 
-          return [route.format(parameterized_parts), params]
+          return ThreeThingObject.new(route, parameterized_parts, params)
         end
 
         unmatched_keys = (missing_keys || []) & constraints.keys

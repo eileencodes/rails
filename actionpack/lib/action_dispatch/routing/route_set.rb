@@ -767,7 +767,7 @@ module ActionDispatch
       end
 
       def generate(route_key, options, recall = {}, method_name = nil)
-        Generator.new(route_key, options, recall, self).generate(method_name)
+        Generator.new(route_key, options, recall, self).generate(method_name).to_a
       end
       private :generate
 
