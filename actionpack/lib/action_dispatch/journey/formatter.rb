@@ -33,7 +33,33 @@ module ActionDispatch
         end
       end
 
-      def generate(name, options, path_parameters, method_name = nil)
+      class MissingRoute
+        attr_reader :routes, :name, :method_name, :constraints, :missing_keys, :unmatched_keys
+
+        def initialize(constraints, missing_keys, unmatched_keys, routes, name, method_name)
+          @constraints = constraints
+          @missing_keys = missing_keys
+          @unmatched_keys = unmatched_keys
+          @routes = routes
+          @name = name
+          @method_name = method_name
+        end
+
+        def to_ary
+          raise ActionController::UrlGenerationError.new(message, routes, name, method_name)
+        end
+        alias :path :to_ary
+        alias :params :to_ary
+
+        def message
+          message = +"No route matches #{Hash[constraints.sort_by { |k, v| k.to_s }].inspect}"
+          message << ", missing required keys: #{missing_keys.sort.inspect}" if missing_keys && !missing_keys.empty?
+          message << ", possible unmatched constraints: #{unmatched_keys.sort.inspect}" if unmatched_keys && !unmatched_keys.empty?
+          message
+        end
+      end
+
+      def generate(name, options, path_parameters, method_name = nil) # awful name
         constraints = path_parameters.merge(options)
         missing_keys = nil
 
@@ -68,11 +94,7 @@ module ActionDispatch
         unmatched_keys = (missing_keys || []) & constraints.keys
         missing_keys = (missing_keys || []) - unmatched_keys
 
-        message = +"No route matches #{Hash[constraints.sort_by { |k, v| k.to_s }].inspect}"
-        message << ", missing required keys: #{missing_keys.sort.inspect}" if missing_keys && !missing_keys.empty?
-        message << ", possible unmatched constraints: #{unmatched_keys.sort.inspect}" if unmatched_keys && !unmatched_keys.empty?
-
-        raise ActionController::UrlGenerationError.new(message, routes, name, method_name)
+        MissingRoute.new(constraints, missing_keys, unmatched_keys, routes, name, method_name)
       end
 
       def clear
