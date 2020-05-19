@@ -60,7 +60,9 @@ module ActionDispatch
         get "/foo/:id", id: /\d/, anchor: false, to: "foo#bar"
 
         assert_raises(ActionController::UrlGenerationError) do
-          _generate(nil, { controller: "foo", action: "bar", id: "10" }, {})
+          @route_set.url_for(
+            { controller: "foo", action: "bar", id: "10" }, #options
+            nil) # route_name
         end
       end
 

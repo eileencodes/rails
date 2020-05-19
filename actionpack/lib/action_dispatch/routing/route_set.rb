@@ -766,8 +766,9 @@ module ActionDispatch
         return path, params.keys
       end
 
-      def generate(route_key, options, recall = {}, method_name = nil)
-        Generator.new(route_key, options, recall, self).generate(method_name).to_ary
+      def generate(route_name, options, recall = {}, method_name = nil)
+        $stderr.puts "XXX: #{caller.first}"
+        Generator.new(route_name, options, recall, self).generate(method_name).to_ary
       end
       private :generate
 
