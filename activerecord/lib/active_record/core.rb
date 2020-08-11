@@ -149,6 +149,14 @@ module ActiveRecord
         Thread.current.thread_variable_set(:ar_connection_handler, handler)
       end
 
+      def self.current_role
+        Thread.current.thread_variable_get(:ar_role) || default_role
+      end
+
+      def self.current_role=(role)
+        Thread.current.thread_variable_set(:ar_role, role)
+      end
+
       def self.current_shard
         Thread.current.thread_variable_get(:ar_shard) || default_shard
       end

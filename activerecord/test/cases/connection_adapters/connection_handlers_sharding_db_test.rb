@@ -11,13 +11,10 @@ module ActiveRecord
       fixtures :people
 
       def setup
-        @handlers = { writing: ConnectionHandler.new, reading: ConnectionHandler.new }
-        @rw_handler = @handlers[:writing]
-        @ro_handler = @handlers[:reading]
         @owner_name = "ActiveRecord::Base"
         db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
-        @rw_pool = @handlers[:writing].establish_connection(db_config)
-        @ro_pool = @handlers[:reading].establish_connection(db_config)
+        @rw_pool = ActiveRecord::Base.connection_handler.establish_connection(db_config, role: :writing)
+        @ro_pool = ActiveRecord::Base.connection_handler.establish_connection(db_config, role: :reading)
       end
 
       def teardown
@@ -52,14 +49,14 @@ module ActiveRecord
             shard_one: { writing: :primary_shard_one }
           })
 
-          base_pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base")
-          default_pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base", shard: :default)
+          base_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing)
+          default_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing, shard: :default)
 
           assert_equal base_pool, default_pool
           assert_equal "test/db/primary.sqlite3", default_pool.db_config.database
           assert_equal "primary", default_pool.db_config.name
 
-          assert_not_nil pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base", shard: :shard_one)
+          assert_not_nil pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing, shard: :shard_one)
           assert_equal "test/db/primary_shard_one.sqlite3", pool.db_config.database
           assert_equal "primary_shard_one", pool.db_config.name
         ensure
@@ -87,23 +84,23 @@ module ActiveRecord
             shard_one: { writing: :primary_shard_one, reading: :primary_shard_one_replica }
           })
 
-          default_writing_pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base", shard: :default)
-          base_writing_pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base")
+          default_writing_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing, shard: :default)
+          base_writing_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base")
           assert_equal base_writing_pool, default_writing_pool
           assert_equal "test/db/primary.sqlite3", default_writing_pool.db_config.database
           assert_equal "primary", default_writing_pool.db_config.name
 
-          default_reading_pool = ActiveRecord::Base.connection_handlers[:reading].retrieve_connection_pool("ActiveRecord::Base", shard: :default)
-          base_reading_pool = ActiveRecord::Base.connection_handlers[:reading].retrieve_connection_pool("ActiveRecord::Base")
+          default_reading_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :reading, shard: :default)
+          base_reading_pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :reading)
           assert_equal base_reading_pool, default_reading_pool
           assert_equal "test/db/primary.sqlite3", default_reading_pool.db_config.database
           assert_equal "primary_replica", default_reading_pool.db_config.name
 
-          assert_not_nil pool = ActiveRecord::Base.connection_handlers[:writing].retrieve_connection_pool("ActiveRecord::Base", shard: :shard_one)
+          assert_not_nil pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", shard: :shard_one)
           assert_equal "test/db/primary_shard_one.sqlite3", pool.db_config.database
           assert_equal "primary_shard_one", pool.db_config.name
 
-          assert_not_nil pool = ActiveRecord::Base.connection_handlers[:reading].retrieve_connection_pool("ActiveRecord::Base", shard: :shard_one)
+          assert_not_nil pool = ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :reading, shard: :shard_one)
           assert_equal "test/db/primary_shard_one.sqlite3", pool.db_config.database
           assert_equal "primary_shard_one_replica", pool.db_config.name
         ensure
@@ -112,7 +109,7 @@ module ActiveRecord
           ENV["RAILS_ENV"] = previous_env
         end
 
-        def test_switching_connections_via_handler
+        def test_switching_connections_via_role
           previous_env, ENV["RAILS_ENV"] = ENV["RAILS_ENV"], "default_env"
 
           config = {
@@ -132,8 +129,6 @@ module ActiveRecord
           })
 
           ActiveRecord::Base.connected_to(role: :reading, shard: :default) do
-            @ro_handler = ActiveRecord::Base.connection_handler
-            assert_equal ActiveRecord::Base.connection_handler, ActiveRecord::Base.connection_handlers[:reading]
             assert_equal :reading, ActiveRecord::Base.current_role
             assert ActiveRecord::Base.connected_to?(role: :reading, shard: :default)
             assert_not ActiveRecord::Base.connected_to?(role: :writing, shard: :default)
@@ -143,8 +138,6 @@ module ActiveRecord
           end
 
           ActiveRecord::Base.connected_to(role: :writing, shard: :default) do
-            assert_equal ActiveRecord::Base.connection_handler, ActiveRecord::Base.connection_handlers[:writing]
-            assert_not_equal @ro_handler, ActiveRecord::Base.connection_handler
             assert_equal :writing, ActiveRecord::Base.current_role
             assert ActiveRecord::Base.connected_to?(role: :writing, shard: :default)
             assert_not ActiveRecord::Base.connected_to?(role: :reading, shard: :default)
@@ -154,8 +147,6 @@ module ActiveRecord
           end
 
           ActiveRecord::Base.connected_to(role: :reading, shard: :shard_one) do
-            @ro_handler = ActiveRecord::Base.connection_handler
-            assert_equal ActiveRecord::Base.connection_handler, ActiveRecord::Base.connection_handlers[:reading]
             assert_equal :reading, ActiveRecord::Base.current_role
             assert ActiveRecord::Base.connected_to?(role: :reading, shard: :shard_one)
             assert_not ActiveRecord::Base.connected_to?(role: :writing, shard: :shard_one)
@@ -165,8 +156,6 @@ module ActiveRecord
           end
 
           ActiveRecord::Base.connected_to(role: :writing, shard: :shard_one) do
-            assert_equal ActiveRecord::Base.connection_handler, ActiveRecord::Base.connection_handlers[:writing]
-            assert_not_equal @ro_handler, ActiveRecord::Base.connection_handler
             assert_equal :writing, ActiveRecord::Base.current_role
             assert ActiveRecord::Base.connected_to?(role: :writing, shard: :shard_one)
             assert_not ActiveRecord::Base.connected_to?(role: :reading, shard: :shard_one)
@@ -242,11 +231,11 @@ module ActiveRecord
         end
 
         def test_retrieve_connection_pool_with_invalid_shard
-          assert_not_nil @rw_handler.retrieve_connection_pool("ActiveRecord::Base")
-          assert_nil @rw_handler.retrieve_connection_pool("ActiveRecord::Base", shard: :foo)
+          assert_not_nil ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing)
+          assert_nil ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :writing, shard: :foo)
 
-          assert_not_nil @ro_handler.retrieve_connection_pool("ActiveRecord::Base")
-          assert_nil @ro_handler.retrieve_connection_pool("ActiveRecord::Base", shard: :foo)
+          assert_not_nil ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :reading)
+          assert_nil ActiveRecord::Base.connection_handler.retrieve_connection_pool("ActiveRecord::Base", role: :reading, shard: :foo)
         end
 
         def test_calling_connected_to_on_a_non_existent_shard_raises
