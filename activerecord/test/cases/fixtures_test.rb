@@ -1425,13 +1425,6 @@ if current_adapter?(:SQLite3Adapter) && !in_memory_db?
       end
     end
 
-    def test_writing_and_reading_connections_are_the_same
-      rw_conn = ActiveRecord::Base.connection_handlers[:writing].connection_pool_list.first.connection
-      ro_conn = ActiveRecord::Base.connection_handlers[:reading].connection_pool_list.first.connection
-
-      assert_equal rw_conn, ro_conn
-    end
-
     private
       def config
         { "default" => default_config, "readonly" => readonly_config }

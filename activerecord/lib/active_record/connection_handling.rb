@@ -49,7 +49,7 @@ module ActiveRecord
     def establish_connection(config_or_env = nil)
       config_or_env ||= DEFAULT_ENV.call.to_sym
       db_config, owner_name = resolve_config_for_connection(config_or_env)
-      connection_handler.establish_connection(db_config, owner_name: owner_name, shard: current_shard)
+      connection_handler.establish_connection(db_config, owner_name: owner_name, role: current_role, shard: current_shard)
     end
 
     # Connects a model to the databases specified. The +database+ keyword
@@ -87,17 +87,15 @@ module ActiveRecord
 
       database.each do |role, database_key|
         db_config, owner_name = resolve_config_for_connection(database_key)
-        handler = lookup_connection_handler(role.to_sym)
 
-        connections << handler.establish_connection(db_config, owner_name: owner_name, role: role)
+        connections << connection_handler.establish_connection(db_config, owner_name: owner_name, role: role.to_sym)
       end
 
       shards.each do |shard, database_keys|
         database_keys.each do |role, database_key|
           db_config, owner_name = resolve_config_for_connection(database_key)
-          handler = lookup_connection_handler(role.to_sym)
 
-          connections << handler.establish_connection(db_config, owner_name: owner_name, role: role, shard: shard.to_sym)
+          connections << connection_handler.establish_connection(db_config, owner_name: owner_name, role: role.to_sym, shard: shard.to_sym)
         end
       end
 
@@ -152,15 +150,12 @@ module ActiveRecord
         end
 
         db_config, owner_name = resolve_config_for_connection(database)
-        handler = lookup_connection_handler(role)
 
-        handler.establish_connection(db_config, owner_name: owner_name, role: role)
+        connection_handler.establish_connection(db_config, owner_name: owner_name, role: role)
 
-        with_handler(role, &blk)
-      elsif shard
-        with_shard(shard, role || current_role, prevent_writes, &blk)
-      elsif role
-        with_role(role, prevent_writes, &blk)
+        with_shard(current_shard, role, prevent_writes, &blk)
+      elsif role || shard
+        with_shard(shard || current_shard, role || current_role, prevent_writes, &blk)
       else
         raise ArgumentError, "must provide a `shard` and/or `role`."
       end
@@ -176,19 +171,6 @@ module ActiveRecord
       current_role == role.to_sym && current_shard == shard.to_sym
     end
 
-    # Returns the symbol representing the current connected role.
-    #
-    #   ActiveRecord::Base.connected_to(role: :writing) do
-    #     ActiveRecord::Base.current_role #=> :writing
-    #   end
-    #
-    #   ActiveRecord::Base.connected_to(role: :reading) do
-    #     ActiveRecord::Base.current_role #=> :reading
-    #   end
-    def current_role
-      connection_handlers.key(connection_handler)
-    end
-
     def lookup_connection_handler(handler_key) # :nodoc:
       handler_key ||= ActiveRecord::Base.writing_role
       connection_handlers[handler_key] ||= ActiveRecord::ConnectionAdapters::ConnectionHandler.new
@@ -196,10 +178,8 @@ module ActiveRecord
 
     # Clears the query cache for all connections associated with the current thread.
     def clear_query_caches_for_current_thread
-      ActiveRecord::Base.connection_handlers.each_value do |handler|
-        handler.connection_pool_list.each do |pool|
-          pool.connection.clear_query_cache if pool.active_connection?
-        end
+      ActiveRecord::Base.connection_handler.connection_pool_list.each do |pool|
+        pool.connection.clear_query_cache if pool.active_connection?
       end
     end
 
@@ -304,13 +284,20 @@ module ActiveRecord
 
       def with_shard(shard, role, prevent_writes)
         old_shard = current_shard
+        old_role = current_role
 
-        with_role(role, prevent_writes) do
+        prevent_writes = true if role == reading_role
+
+        connection_handler.while_preventing_writes(prevent_writes) do
           self.current_shard = shard
-          yield
+          self.current_role = role
+          return_value = yield
+          return_value.load if return_value.is_a? ActiveRecord::Relation
+          return_value
         end
       ensure
         self.current_shard = old_shard
+        self.current_role = old_role
       end
 
       def swap_connection_handler(handler, &blk) # :nodoc:
