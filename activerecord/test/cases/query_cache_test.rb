@@ -80,9 +80,10 @@ class QueryCacheTest < ActiveRecord::TestCase
       ActiveRecord::Base.establish_connection(db_config)
     end
 
+    # access connection_handlers
+    # connection_pool_list
     mw = middleware { |env|
-      pool_configs = ActiveRecord::Base.connection_handler.connection_pool_list_for_role(:reading)
-      ro_conn = pool_configs.first.connection
+      ro_conn = ActiveRecord::Base.connection_handler.connection_pool_list(:reading).first.connection
       assert_predicate ActiveRecord::Base.connection, :query_cache_enabled
       assert_predicate ro_conn, :query_cache_enabled
     }

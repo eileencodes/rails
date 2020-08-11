@@ -320,8 +320,9 @@ module ActiveRecord
       end
 
       def test_connection_pools
-        assert_equal([@rw_pool], @handler.connection_pools_for_role(:writing))
-        assert_equal([@ro_pool], @handler.connection_pools_for_role(:reading))
+        assert_equal([@rw_pool], @handler.connection_pools(:writing))
+        assert_equal([@ro_pool], @handler.connection_pools(:reading))
+        assert_equal([@rw_pool, @ro_pool], @handler.connection_pools)
       end
 
       def test_retrieve_connection

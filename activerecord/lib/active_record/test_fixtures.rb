@@ -194,9 +194,11 @@ module ActiveRecord
 
         handler.connection_pool_names.each do |name|
           pool_manager = handler.send(:owner_to_pool_manager)[name]
-          writing_pool_config = pool_manager.get_pool_config(ActiveRecord::Base.writing_role, ActiveRecord::Base.default_shard)
-          pool_manager.role_names.each do |role|
-            pool_manager.set_pool_config(role, ActiveRecord::Base.default_shard, writing_pool_config)
+          pool_manager.shard_names.each do |shard_name|
+            writing_pool_config = pool_manager.get_pool_config(ActiveRecord::Base.writing_role, shard_name)
+            pool_manager.role_names.each do |role|
+              pool_manager.set_pool_config(role, shard_name, writing_pool_config)
+            end
           end
         end
       end

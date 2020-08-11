@@ -7,6 +7,10 @@ module ActiveRecord
         @name_to_role_mapping = Hash.new { |h, k| h[k] = {} }
       end
 
+      def shard_names
+        @name_to_role_mapping.values.flat_map { |shard_map| shard_map.keys }
+      end
+
       def role_names
         @name_to_role_mapping.keys
       end
