@@ -1026,17 +1026,10 @@ module ActiveRecord
         owner_to_pool_manager.keys
       end
 
-      def connection_pool_list
-        owner_to_pool_manager.values.flat_map { |m| m.pool_configs.map(&:pool) }
+      def connection_pool_list(role = nil)
+        owner_to_pool_manager.values.flat_map { |m| m.pool_configs(role).map(&:pool) }
       end
       alias :connection_pools :connection_pool_list
-
-      def connection_pool_list_for_role(role)
-        owner_to_pool_manager.values.compact.flat_map do |m|
-          m.pool_configs(role).map(&:pool)
-        end
-      end
-      alias :connection_pools_for_role :connection_pool_list_for_role
 
       def establish_connection(config, owner_name: Base.name, role: Base.default_role, shard: Base.default_shard)
         owner_name = config.to_s if config.is_a?(Symbol)
