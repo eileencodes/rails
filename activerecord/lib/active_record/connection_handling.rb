@@ -89,7 +89,7 @@ module ActiveRecord
         db_config, owner_name = resolve_config_for_connection(database_key)
         handler = lookup_connection_handler(role.to_sym)
 
-        connections << handler.establish_connection(db_config, owner_name: owner_name)
+        connections << handler.establish_connection(db_config, owner_name: owner_name, role: role)
       end
 
       shards.each do |shard, database_keys|
@@ -97,7 +97,7 @@ module ActiveRecord
           db_config, owner_name = resolve_config_for_connection(database_key)
           handler = lookup_connection_handler(role.to_sym)
 
-          connections << handler.establish_connection(db_config, owner_name: owner_name, shard: shard.to_sym)
+          connections << handler.establish_connection(db_config, owner_name: owner_name, role: role, shard: shard.to_sym)
         end
       end
 
@@ -154,7 +154,7 @@ module ActiveRecord
         db_config, owner_name = resolve_config_for_connection(database)
         handler = lookup_connection_handler(role)
 
-        handler.establish_connection(db_config, owner_name: owner_name)
+        handler.establish_connection(db_config, owner_name: owner_name, role: role)
 
         with_handler(role, &blk)
       elsif shard
@@ -247,16 +247,16 @@ module ActiveRecord
     end
 
     def connection_pool
-      connection_handler.retrieve_connection_pool(connection_specification_name, shard: current_shard) || raise(ConnectionNotEstablished)
+      connection_handler.retrieve_connection_pool(connection_specification_name, role: current_role, shard: current_shard) || raise(ConnectionNotEstablished)
     end
 
     def retrieve_connection
-      connection_handler.retrieve_connection(connection_specification_name, shard: current_shard)
+      connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
     end
 
     # Returns +true+ if Active Record is connected.
     def connected?
-      connection_handler.connected?(connection_specification_name, shard: current_shard)
+      connection_handler.connected?(connection_specification_name, role: current_role, shard: current_shard)
     end
 
     def remove_connection(name = nil)
@@ -264,11 +264,11 @@ module ActiveRecord
       # if removing a connection that has a pool, we reset the
       # connection_specification_name so it will use the parent
       # pool.
-      if connection_handler.retrieve_connection_pool(name, shard: current_shard)
+      if connection_handler.retrieve_connection_pool(name, role: current_role, shard: current_shard)
         self.connection_specification_name = nil
       end
 
-      connection_handler.remove_connection_pool(name, shard: current_shard)
+      connection_handler.remove_connection_pool(name, role: current_role, shard: current_shard)
     end
 
     def clear_cache! # :nodoc:

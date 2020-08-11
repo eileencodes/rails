@@ -135,6 +135,8 @@ module ActiveRecord
 
       class_attribute :default_connection_handler, instance_writer: false
 
+      class_attribute :default_role, instance_writer: false
+
       class_attribute :default_shard, instance_writer: false
 
       self.filter_attributes = []
@@ -156,6 +158,7 @@ module ActiveRecord
       end
 
       self.default_connection_handler = ConnectionAdapters::ConnectionHandler.new
+      self.default_role = :writing
       self.default_shard = :default
     end
 
