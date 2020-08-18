@@ -150,11 +150,35 @@ module ActiveRecord
       end
 
       def self.current_role
-        Thread.current.thread_variable_get(:ar_role) || default_role
+        role = current_role_map[self]
+        return role if role
+
+        return default_role if self == Base
+
+        superclass.current_role
       end
 
+      def self.current_role_for_specifically_this_owner
+        current_role_map[self]
+      end
+
+
       def self.current_role=(role)
-        Thread.current.thread_variable_set(:ar_role, role)
+        current_role_map[self] = role
+      end
+
+      def self.current_role_map
+        role_map = nil
+
+        thread = Thread.current
+        role_map = thread.thread_variable_get(:ar_role_map)
+
+        if role_map.nil?
+          role_map = Concurrent::Map.new
+          Thread.current.thread_variable_set(:ar_role_map, role_map)
+        end
+
+        role_map
       end
 
       def self.current_shard
