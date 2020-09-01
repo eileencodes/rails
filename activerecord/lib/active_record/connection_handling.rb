@@ -166,6 +166,7 @@ module ActiveRecord
     #     ActiveRecord::Base.connected_to?(role: :reading) #=> false
     #   end
     def connected_to?(role:, shard: ActiveRecord::Base.default_shard)
+      p current_role
       current_role == role.to_sym && current_shard == shard.to_sym
     end
 
@@ -229,6 +230,7 @@ module ActiveRecord
     end
 
     def retrieve_connection
+      p rc: current_role
       connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
     end
 

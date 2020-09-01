@@ -162,7 +162,6 @@ module ActiveRecord
         current_role_map[self]
       end
 
-
       def self.current_role=(role)
         current_role_map[self] = role
       end
