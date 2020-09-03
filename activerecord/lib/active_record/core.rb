@@ -149,43 +149,36 @@ module ActiveRecord
         Thread.current.thread_variable_set(:ar_connection_handler, handler)
       end
 
-      def self.current_role
-        role = current_role_map[self]
-        return role if role
-
-        return default_role if self == Base
-
-        superclass.current_role
-      end
-
-      def self.current_role_for_specifically_this_owner
-        current_role_map[self]
-      end
-
-      def self.current_role=(role)
-        current_role_map[self] = role
-      end
-
-      def self.current_role_map
-        role_map = nil
+      def self.role_and_shard_stack
+        role_and_shard_stack = nil
 
         thread = Thread.current
-        role_map = thread.thread_variable_get(:ar_role_map)
+        role_and_shard_stack = thread.thread_variable_get(:ar_role_and_shard_stack)
 
-        if role_map.nil?
-          role_map = Concurrent::Map.new
-          Thread.current.thread_variable_set(:ar_role_map, role_map)
+        if role_and_shard_stack.nil?
+          role_and_shard_stack = Concurrent::Array.new
+          Thread.current.thread_variable_set(:ar_role_and_shard_stack, role_and_shard_stack)
         end
 
-        role_map
+        role_and_shard_stack
+      end
+
+      def self.current_role
+        role_and_shard_stack.reverse.each do |hash|
+          return hash[:role] if hash[:role] && hash[:klass] == Base
+          return hash[:role] if hash[:role] && hash[:klass] == superclass # won't work for STI
+        end
+
+        default_role
       end
 
       def self.current_shard
-        Thread.current.thread_variable_get(:ar_shard) || default_shard
-      end
+        role_and_shard_stack.reverse.each do |hash|
+          return hash[:shard] if hash[:shard] && hash[:klass] == Base
+          return hash[:shard] if hash[:shard] && hash[:klass] == superclass # won't work for STI
+        end
 
-      def self.current_shard=(shard)
-        Thread.current.thread_variable_set(:ar_shard, shard)
+        default_shard
       end
 
       self.default_connection_handler = ConnectionAdapters::ConnectionHandler.new

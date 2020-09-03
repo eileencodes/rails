@@ -166,7 +166,6 @@ module ActiveRecord
     #     ActiveRecord::Base.connected_to?(role: :reading) #=> false
     #   end
     def connected_to?(role:, shard: ActiveRecord::Base.default_shard)
-      p current_role
       current_role == role.to_sym && current_shard == shard.to_sym
     end
 
@@ -230,7 +229,6 @@ module ActiveRecord
     end
 
     def retrieve_connection
-      p rc: current_role
       connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
     end
 
@@ -283,21 +281,16 @@ module ActiveRecord
       end
 
       def with_shard(shard, role, prevent_writes)
-        old_shard = current_shard
-        old_role = current_role_for_specifically_this_owner
-
         prevent_writes = true if role == reading_role
 
         connection_handler.while_preventing_writes(prevent_writes) do
-          self.current_shard = shard
-          self.current_role = role
+          self.role_and_shard_stack << { role: role, shard: shard, klass: self }
           return_value = yield
           return_value.load if return_value.is_a? ActiveRecord::Relation
           return_value
         end
       ensure
-        self.current_shard = old_shard
-        self.current_role = old_role
+        self.role_and_shard_stack.pop
       end
 
       def swap_connection_handler(handler, &blk) # :nodoc:
