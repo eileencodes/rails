@@ -164,7 +164,7 @@ module ActiveRecord
       end
 
       def self.current_role
-        role_and_shard_stack.reverse.each do |hash|
+        role_and_shard_stack.reverse_each do |hash|
           return hash[:role] if hash[:role] && hash[:klass] == Base
           return hash[:role] if hash[:role] && hash[:klass] == superclass # won't work for STI
         end
@@ -173,7 +173,7 @@ module ActiveRecord
       end
 
       def self.current_shard
-        role_and_shard_stack.reverse.each do |hash|
+        role_and_shard_stack.reverse_each do |hash|
           return hash[:shard] if hash[:shard] && hash[:klass] == Base
           return hash[:shard] if hash[:shard] && hash[:klass] == superclass # won't work for STI
         end
