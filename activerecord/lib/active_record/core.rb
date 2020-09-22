@@ -150,17 +150,13 @@ module ActiveRecord
       end
 
       def self.role_and_shard_stack
-        role_and_shard_stack = nil
-
-        thread = Thread.current
-        role_and_shard_stack = thread.thread_variable_get(:ar_role_and_shard_stack)
-
-        if role_and_shard_stack.nil?
+        if role_and_shard_stack = Thread.current.thread_variable_get(:ar_role_and_shard_stack)
+          role_and_shard_stack
+        else
           role_and_shard_stack = Concurrent::Array.new
           Thread.current.thread_variable_set(:ar_role_and_shard_stack, role_and_shard_stack)
+          role_and_shard_stack
         end
-
-        role_and_shard_stack
       end
 
       def self.current_role
