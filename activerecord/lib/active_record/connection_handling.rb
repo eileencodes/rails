@@ -234,7 +234,12 @@ module ActiveRecord
       if legacy_connection_handling
         connection_handler.while_preventing_writes(enabled, &block)
       else
-        connected_to(role: current_role, prevent_writes: enabled, &block)
+        begin
+          original, connection.prevent_writes = connection.prevent_writes, enabled
+          connected_to(role: current_role, shard: current_shard, prevent_writes: enabled, &block)
+        ensure
+          connection.prevent_writes = original
+        end
       end
     end
 
@@ -316,7 +321,9 @@ module ActiveRecord
     end
 
     def retrieve_connection
-      connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
+      connection = connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
+      connection.prevent_writes = current_preventing_writes
+      connection
     end
 
     # Returns +true+ if Active Record is connected.

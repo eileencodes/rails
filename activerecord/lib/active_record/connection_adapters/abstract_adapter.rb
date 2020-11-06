@@ -119,8 +119,16 @@ module ActiveRecord
         if ActiveRecord::Base.legacy_connection_handling
           replica? || ActiveRecord::Base.connection_handler.prevent_writes
         else
-          replica? || ActiveRecord::Base.current_preventing_writes
+          replica? || self.prevent_writes
         end
+      end
+
+      def prevent_writes # :nodoc:
+        Thread.current[:prevent_writes]
+      end
+
+      def prevent_writes=(prevent_writes) # :nodoc:
+        Thread.current[:prevent_writes] = prevent_writes
       end
 
       def migrations_paths # :nodoc:
