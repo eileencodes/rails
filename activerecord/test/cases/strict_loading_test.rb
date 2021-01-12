@@ -109,6 +109,22 @@ class StrictLoadingTest < ActiveRecord::TestCase
     end
   end
 
+  def test_strict_loading_is_ignored_on_reload
+    with_strict_loading_by_default(Developer) do
+      ship = Ship.create!(developer: Developer.first, name: "The Great Ship")
+      developer = Developer.preload(:ship).first
+
+      assert_predicate developer, :strict_loading?
+      assert_equal ship, developer.ship
+
+      developer.reload
+
+      assert_nothing_raised do
+        assert_equal ship, developer.ship
+      end
+    end
+  end
+
   def test_preload_audit_logs_are_strict_loading_because_parent_is_strict_loading
     developer = Developer.first
 
