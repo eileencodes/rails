@@ -25,15 +25,16 @@ class HasManyThroughSplitAssociationsTest < ActiveRecord::TestCase
   end
 
   def test_fetching_on_split_through
-    #assert_equal @author.comments.first.id, @author.split_comments.first.id
+    assert_equal @author.comments.first.id, @author.split_comments.first.id
     assert_queries(2) { @author.split_comments.first.id }
-    #assert_queries(1) { @author.comments.first.id }
+    assert_queries(1) { @author.comments.first.id }
   end
 
   def test_to_a_on_split_through
-    #assert_equal @author.comments.to_a, @author.split_comments.to_a
+    assert_equal @author.comments.to_a, @author.split_comments.to_a
+    @author.reload
     assert_queries(2) { @author.split_comments.to_a }
-    #assert_queries(1) { @author.comments.to_a }
+    assert_queries(1) { @author.comments.to_a }
   end
 
   #def test_appending_on_split_through
