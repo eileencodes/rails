@@ -83,8 +83,6 @@ module ActiveRecord
             scope = apply_scope(scope, reflection.aliased_table, reflection.type, polymorphic_type)
           end
 
-          puts scope.order_values
-          puts ordered
           if scope.order_values.empty? && ordered
             split_scope = SplitAssociationRelation.create(scope.klass, key, join_ids)
             split_scope.where_clause += scope.where_clause

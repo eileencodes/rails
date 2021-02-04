@@ -8,7 +8,7 @@ module ActiveRecord
         SplitAssociationScope.create.scope(self)
       end
 
-      def target
+      def find_target
         scope.to_a
       end
     end
