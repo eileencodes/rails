@@ -448,7 +448,7 @@ module ActiveRecord
             end
           end
         ensure
-          ActiveRecord::Base.application_record_class = nil
+          ActiveRecord::Base.primary_abstract_class = nil
           Object.send(:remove_const, :ApplicationRecord)
           ActiveRecord::Base.establish_connection :arunit
         end

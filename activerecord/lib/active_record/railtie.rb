@@ -37,6 +37,11 @@ module ActiveRecord
 
     config.eager_load_namespaces << ActiveRecord
 
+    if defined?(ApplicationRecord)
+      p "hi?"
+      config.active_record.primary_abstract_class = "ApplicationRecord"
+    end
+
     rake_tasks do
       namespace :db do
         task :load_config do

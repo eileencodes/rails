@@ -129,13 +129,17 @@ end
 ```
 
 If you use a differently named class for your application record you need to
-set `primary_abstract_class` instead, so that Rails knows which class `ActiveRecord::Base`
+set that in the application configuration so that Rails knows which class `ActiveRecord::Base`
 should share a connection with.
 
-```
+```ruby
 class PrimaryApplicationRecord < ActiveRecord::Base
-  self.primary_abstract_class
+  self.abstract_class = true
 end
+```
+
+```ruby
+config.active_record.primary_abstract_class = "PrimaryApplicationRecord"
 ```
 
 Classes that connect to primary/primary_replica can inherit from your primary abstract

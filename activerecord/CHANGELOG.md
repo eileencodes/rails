@@ -1,3 +1,24 @@
+*   Make `primary_abstract_class` a config option instead of a class setting
+
+    Multiple database applications that use a primary abstract class that is not
+    named `ApplicationRecord` can now set a specific class to be the `primary_abstract_class`.
+    This must be done in the configuration, otherwise the class won't be loaded correctly in
+    development. By default, "ApplicationRecord" is set to the `primary_abstract_class`.
+
+    ```ruby
+    config.active_record.primary_abstract_class = "PrimaryApplicationRecord"
+    ```
+
+    When an application boots it automatically connects to the primary or first database in the
+    database configuration file. In a multiple database application that then call `connects_to`
+    needs to know that the default connection is the same as the `ApplicationRecord` connection.
+    However, some applications have a differently named `ApplicationRecord`. This prevents Active
+    Record from opening duplicate connections to the same database.
+
+    This is a followup to #41258.
+
+    *Eileen M. Uchitelle*, *John Crepezzi*
+
 *   Improve performance of `one?` and `many?` by limiting the generated count query to 2 results.
 
     *Gonzalo Riestra*

@@ -166,7 +166,7 @@ module ActiveRecord
 
       mattr_accessor :legacy_connection_handling, instance_writer: false, default: true
 
-      mattr_accessor :application_record_class, instance_accessor: false, default: nil
+      mattr_accessor :primary_abstract_class, instance_accessor: false, default: nil
 
       # Sets the async_query_executor for an application. By default the thread pool executor
       # set to +nil+ which will not run queries in the background. Applications must configure
@@ -204,14 +204,11 @@ module ActiveRecord
         @@global_executor_concurrency ||= nil
       end
 
-      def self.application_record_class? # :nodoc:
-        if Base.application_record_class
-          self == Base.application_record_class
+      def self.primary_abstract_class? # :nodoc:
+        if Base.primary_abstract_class
+          name == Base.primary_abstract_class
         else
-          if defined?(ApplicationRecord) && self == ApplicationRecord
-            Base.application_record_class = self
-            true
-          end
+          defined?(ApplicationRecord) && self == ApplicationRecord
         end
       end
 
