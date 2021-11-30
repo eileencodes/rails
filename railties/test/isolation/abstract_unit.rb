@@ -144,10 +144,12 @@ module TestHelpers
               <<: *default
               database: db/development_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
             animals_readonly:
               <<: *default
               database: db/development_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
               replica: true
           test:
             primary:
@@ -161,10 +163,12 @@ module TestHelpers
               <<: *default
               database: db/test_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
             animals_readonly:
               <<: *default
               database: db/test_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
               replica: true
           production:
             primary:
@@ -178,10 +182,12 @@ module TestHelpers
               <<: *default
               database: db/production_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
             animals_readonly:
               <<: *default
               database: db/production_animals.sqlite3
               migrations_paths: db/animals_migrate
+              schema_cache_path: db/animals_schema_cache.yml
               replica: true
           YAML
         end

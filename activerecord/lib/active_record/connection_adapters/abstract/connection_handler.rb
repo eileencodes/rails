@@ -237,6 +237,15 @@ module ActiveRecord
         pool_config&.pool
       end
 
+      # Returns all the pools (writing, reading, sharded) in
+      # the pool manager for a given owner class.
+      def retrieve_connection_pools_for(owner)
+        pool_manager = get_pool_manager(owner)
+        return unless pool_manager
+
+        pool_manager.pool_configs.map(&:pool)
+      end
+
       private
         attr_reader :owner_to_pool_manager
 

@@ -309,6 +309,10 @@ module ActiveRecord
       connection_handler.retrieve_connection_pool(connection_specification_name, role: current_role, shard: current_shard) || raise(ConnectionNotEstablished)
     end
 
+    def connection_pools
+      connection_handler.retrieve_connection_pools_for(connection_specification_name)
+    end
+
     def retrieve_connection
       connection_handler.retrieve_connection(connection_specification_name, role: current_role, shard: current_shard)
     end
