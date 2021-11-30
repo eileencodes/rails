@@ -428,6 +428,62 @@ module ApplicationTests
       assert_includes Post.instance_methods, :title
     end
 
+    test "eager loads attribute methods in production when the schema cache is lazily populated in a multi-db app" do
+      build_app(multi_db: true, initializers: true)
+
+      add_to_env_config "development", "config.cache_classes = true"
+      add_to_env_config "development", "config.eager_load = true"
+      add_to_env_config "development", "config.active_record.lazily_load_schema_cache = true"
+
+      app_file "app/models/post.rb", <<-RUBY
+        class Post < ApplicationRecord
+        end
+      RUBY
+
+      app_file "app/models/animals_record.rb", <<-RUBY
+        class AnimalsRecord < ApplicationRecord
+          self.abstract_class = true
+          connects_to database: { writing: :animals }
+        end
+      RUBY
+
+      app_file "app/models/dog.rb", <<-RUBY
+        class Dog < AnimalsRecord
+        end
+      RUBY
+
+      app_file "db/migrate/01_one_migration.rb", <<-MIGRATION
+        class OneMigration < ActiveRecord::Migration::Current
+          create_table :posts do |t|
+            t.string :title
+          end
+        end
+      MIGRATION
+
+      app_file "db/animals_migrate/02_two_migration.rb", <<-MIGRATION
+        class TwoMigration < ActiveRecord::Migration::Current
+          create_table :dogs do |t|
+            t.string :name
+          end
+        end
+      MIGRATION
+
+      Dir.chdir(app_path) do
+        rails "db:migrate"
+        rails "db:schema:cache:dump"
+
+        post = lambda { rails("runner", "puts Post.instance_methods.include?(:title)").strip }
+        dog = lambda { rails("runner", "puts Dog.instance_methods.include?(:name)").strip }
+        post_read = lambda { rails("runner", "ActiveRecord::Base.connected_to(role: :reading) { puts Post.instance_methods.include?(:title) }").strip }
+        dog_read = lambda { rails("runner", "ActiveRecord::Base.connected_to(role: :reading) { puts Dog.instance_methods.include?(:name) } ").strip }
+
+        assert_equal "true", post[]
+        assert_equal "true", dog[]
+        assert_equal "true", post_read[]
+        assert_equal "true", dog_read[]
+      end
+    end
+
     test "does not attempt to eager load attribute methods for models that aren't connected" do
       app_file "app/models/post.rb", <<-RUBY
         class Post < ActiveRecord::Base

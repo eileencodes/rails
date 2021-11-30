@@ -179,16 +179,20 @@ To keep using the current cache store, you can turn off cache versioning entirel
           if app.config.eager_load
             begin
               descendants.each do |model|
-                # If the schema cache was loaded from a dump, we can use it without connecting
-                schema_cache = model.connection_pool.schema_cache
+                model.connection_pools.each do |pool|
+                  # If the schema cache was loaded from a dump, we can use it without connecting
+                  schema_cache = pool.schema_cache
 
-                # If there's no connection yet, we avoid connecting.
-                schema_cache ||= model.connected? && model.connection.schema_cache
+                  # If there's no connection yet, we avoid connecting.
+                  schema_cache ||= pool.connected? && pool.connection.schema_cache
 
-                # If the schema cache doesn't have the columns
-                # hash for the model cached, `define_attribute_methods` would trigger a query.
-                if schema_cache && schema_cache.columns_hash?(model.table_name)
-                  model.define_attribute_methods
+                  # If the schema cache doesn't have the columns
+                  # hash for the model cached, `define_attribute_methods` would trigger a query.
+                  if schema_cache && schema_cache.columns_hash?(model.table_name)
+                    ActiveRecord::Base.connected_to(role: pool.role, shard: pool.shard) do
+                      model.define_attribute_methods
+                    end
+                  end
                 end
               end
             rescue ActiveRecordError => error
