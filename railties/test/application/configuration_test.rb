@@ -428,7 +428,7 @@ module ApplicationTests
       assert_includes Post.instance_methods, :title
     end
 
-    test "eager loads attribute methods in production when the schema cache is lazily populated in a multi-db app" do
+    test "me" do
       build_app(multi_db: true, initializers: true)
 
       add_to_env_config "development", "config.cache_classes = true"
@@ -474,8 +474,13 @@ module ApplicationTests
 
         post = lambda { rails("runner", "puts Post.instance_methods.include?(:title)").strip }
         dog = lambda { rails("runner", "puts Dog.instance_methods.include?(:name)").strip }
+        post_read = lambda { rails("runner", "ActiveRecord::Base.connected_to(role: :reading) { puts Post.instance_methods.include?(:title) }").strip }
+        dog_read = lambda { rails("runner", "ActiveRecord::Base.connected_to(role: :reading) { puts Dog.instance_methods.include?(:name) } ").strip }
+
         assert_equal "true", post[]
         assert_equal "true", dog[]
+        assert_equal "true", post_read[]
+        assert_equal "true", dog_read[]
       end
     end
 
