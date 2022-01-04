@@ -124,8 +124,73 @@ module TestHelpers
       end
 
       if options[:multi_db]
-        File.open("#{app_path}/config/database.yml", "w") do |f|
-          f.puts <<-YAML
+        use_multi_db_configs
+      else
+        use_default_configs
+      end
+
+      add_to_config <<-RUBY
+        config.hosts << proc { true }
+        config.eager_load = false
+        config.session_store :cookie_store, key: "_myapp_session"
+        config.cache_store = :mem_cache_store
+        config.active_support.deprecation = :log
+        config.action_controller.allow_forgery_protection = false
+      RUBY
+    end
+
+    def teardown_app
+      ENV["RAILS_ENV"] = @prev_rails_env if @prev_rails_env
+      FileUtils.rm_rf(tmp_path)
+    end
+
+    # Make a very basic app, without creating the whole directory structure.
+    # This is faster and simpler than the method above.
+    def make_basic_app
+      require "rails"
+      require "action_controller/railtie"
+      require "action_view/railtie"
+
+      @app = Class.new(Rails::Application) do
+        def self.name; "RailtiesTestApp"; end
+      end
+      @app.config.hosts << proc { true }
+      @app.config.eager_load = false
+      @app.config.session_store :cookie_store, key: "_myapp_session"
+      @app.config.active_support.deprecation = :log
+      @app.config.log_level = :info
+      @app.secrets.secret_key_base = "b3c631c314c0bbca50c1b2843150fe33"
+
+      yield @app if block_given?
+      @app.initialize!
+
+      @app.routes.draw do
+        get "/" => "omg#index"
+      end
+
+      require "rack/test"
+      extend ::Rack::Test::Methods
+    end
+
+    def simple_controller
+      controller :foo, <<-RUBY
+        class FooController < ApplicationController
+          def index
+            render plain: "foo"
+          end
+        end
+      RUBY
+
+      app_file "config/routes.rb", <<-RUBY
+        Rails.application.routes.draw do
+          get ':controller(/:action)'
+        end
+      RUBY
+    end
+
+    def use_multi_db_configs
+      File.open("#{app_path}/config/database.yml", "w") do |f|
+        f.puts <<-YAML
           default: &default
             adapter: sqlite3
             pool: 5
@@ -190,10 +255,12 @@ module TestHelpers
               schema_cache_path: db/animals_schema_cache.yml
               replica: true
           YAML
-        end
-      else
-        File.open("#{app_path}/config/database.yml", "w") do |f|
-          f.puts <<-YAML
+      end
+    end
+
+    def use_default_configs
+      File.open("#{app_path}/config/database.yml", "w") do |f|
+        f.puts <<-YAML
           default: &default
             adapter: sqlite3
             pool: 5
@@ -207,67 +274,8 @@ module TestHelpers
           production:
             <<: *default
             database: db/production.sqlite3
-          YAML
-        end
+        YAML
       end
-
-      add_to_config <<-RUBY
-        config.hosts << proc { true }
-        config.eager_load = false
-        config.session_store :cookie_store, key: "_myapp_session"
-        config.cache_store = :mem_cache_store
-        config.active_support.deprecation = :log
-        config.action_controller.allow_forgery_protection = false
-      RUBY
-    end
-
-    def teardown_app
-      ENV["RAILS_ENV"] = @prev_rails_env if @prev_rails_env
-      FileUtils.rm_rf(tmp_path)
-    end
-
-    # Make a very basic app, without creating the whole directory structure.
-    # This is faster and simpler than the method above.
-    def make_basic_app
-      require "rails"
-      require "action_controller/railtie"
-      require "action_view/railtie"
-
-      @app = Class.new(Rails::Application) do
-        def self.name; "RailtiesTestApp"; end
-      end
-      @app.config.hosts << proc { true }
-      @app.config.eager_load = false
-      @app.config.session_store :cookie_store, key: "_myapp_session"
-      @app.config.active_support.deprecation = :log
-      @app.config.log_level = :info
-      @app.secrets.secret_key_base = "b3c631c314c0bbca50c1b2843150fe33"
-
-      yield @app if block_given?
-      @app.initialize!
-
-      @app.routes.draw do
-        get "/" => "omg#index"
-      end
-
-      require "rack/test"
-      extend ::Rack::Test::Methods
-    end
-
-    def simple_controller
-      controller :foo, <<-RUBY
-        class FooController < ApplicationController
-          def index
-            render plain: "foo"
-          end
-        end
-      RUBY
-
-      app_file "config/routes.rb", <<-RUBY
-        Rails.application.routes.draw do
-          get ':controller(/:action)'
-        end
-      RUBY
     end
 
     class Bukkit

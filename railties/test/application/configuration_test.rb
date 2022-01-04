@@ -428,7 +428,7 @@ module ApplicationTests
       assert_includes Post.instance_methods, :title
     end
 
-    test "me" do
+    test "eager loads attribute methods in production when the schema cache is lazily populated in a multi-db app" do
       build_app(multi_db: true, initializers: true)
 
       add_to_env_config "development", "config.cache_classes = true"
