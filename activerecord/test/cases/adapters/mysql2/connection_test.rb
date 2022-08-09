@@ -31,7 +31,8 @@ class Mysql2ConnectionTest < ActiveRecord::Mysql2TestCase
 
   def test_no_automatic_reconnection_after_timeout
     assert_predicate @connection, :active?
-    cause_server_side_disconnect
+    @connection.update("set @@wait_timeout=1")
+    sleep 2
     assert_not_predicate @connection, :active?
   ensure
     # Repair all fixture connections so other tests won't break.
@@ -40,14 +41,16 @@ class Mysql2ConnectionTest < ActiveRecord::Mysql2TestCase
 
   def test_successful_reconnection_after_timeout_with_manual_reconnect
     assert_predicate @connection, :active?
-    cause_server_side_disconnect
+    @connection.update("set @@wait_timeout=1")
+    sleep 2
     @connection.reconnect!
     assert_predicate @connection, :active?
   end
 
   def test_successful_reconnection_after_timeout_with_verify
     assert_predicate @connection, :active?
-    cause_server_side_disconnect
+    @connection.update("set @@wait_timeout=1")
+    sleep 2
     @connection.verify!
     assert_predicate @connection, :active?
   end
@@ -218,11 +221,6 @@ class Mysql2ConnectionTest < ActiveRecord::Mysql2TestCase
   end
 
   private
-    def cause_server_side_disconnect
-      @connection.update("set @@wait_timeout=1")
-      sleep 2
-    end
-
     def test_lock_free(lock_name)
       @connection.select_value("SELECT IS_FREE_LOCK(#{@connection.quote(lock_name)})") == 1
     end

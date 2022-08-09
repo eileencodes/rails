@@ -264,7 +264,7 @@ module ActiveRecord
       class StatementPool < ConnectionAdapters::StatementPool # :nodoc:
         def initialize(connection, max)
           super(max)
-          @connection = connection
+          @raw_connection = connection
           @counter = 0
         end
 
@@ -274,14 +274,14 @@ module ActiveRecord
 
         private
           def dealloc(key)
-            # This is ugly, but safe: the statement pool is only
-            # accessed while holding the connection's lock. (And we
-            # don't need the complication of with_raw_connection because
-            # a reconnect would invalidate the entire statement pool.)
-            if conn = @connection.instance_variable_get(:@raw_connection)
-              conn.query "DEALLOCATE #{key}" if conn.status == PG::CONNECTION_OK
-            end
+            @raw_connection.query "DEALLOCATE #{key}" if connection_active?
           rescue PG::Error
+          end
+
+          def connection_active?
+            @raw_connection.status == PG::CONNECTION_OK
+          rescue PG::Error
+            false
           end
       end
 
@@ -325,6 +325,19 @@ module ActiveRecord
         end
       end
 
+      # Close then reopen the connection.
+      def reconnect!(restore_transactions: false)
+        @lock.synchronize do
+          begin
+            @raw_connection.reset
+          rescue PG::ConnectionBad
+            connect
+          end
+
+          super
+        end
+      end
+
       def reset!
         @lock.synchronize do
           unless @raw_connection.transaction_status == ::PG::PQTRANS_IDLE
@@ -364,7 +377,7 @@ module ActiveRecord
       end
 
       def set_standard_conforming_strings
-        internal_execute("SET standard_conforming_strings = on")
+        execute("SET standard_conforming_strings = on", "SCHEMA")
       end
 
       def supports_ddl_transactions?
@@ -450,7 +463,7 @@ module ActiveRecord
       end
 
       def extensions
-        exec_query("SELECT extname FROM pg_extension", "SCHEMA", allow_retry: true, uses_transaction: false).cast_values
+        exec_query("SELECT extname FROM pg_extension", "SCHEMA").cast_values
       end
 
       # Returns a list of defined enum types, and their values.
@@ -466,7 +479,7 @@ module ActiveRecord
           GROUP BY type.OID, type.typname;
         SQL
 
-        exec_query(query, "SCHEMA", allow_retry: true, uses_transaction: false).cast_values.each_with_object({}) do |row, memo|
+        exec_query(query, "SCHEMA").cast_values.each_with_object({}) do |row, memo|
           memo[row.first] = row.last
         end.to_a
       end
@@ -509,7 +522,7 @@ module ActiveRecord
       # Set the authorized user for this session
       def session_auth=(user)
         clear_cache!
-        internal_execute("SET SESSION AUTHORIZATION #{user}", nil, uses_transaction: true)
+        execute("SET SESSION AUTHORIZATION #{user}")
       end
 
       def use_insert_returning?
@@ -518,7 +531,7 @@ module ActiveRecord
 
       # Returns the version of the connected PostgreSQL server.
       def get_database_version # :nodoc:
-        valid_raw_connection.server_version
+        @raw_connection.server_version
       end
       alias :postgresql_version :database_version
 
@@ -686,17 +699,6 @@ module ActiveRecord
           when nil
             if exception.message.match?(/connection is closed/i)
               ConnectionNotEstablished.new(exception)
-            elsif exception.is_a?(PG::ConnectionBad)
-              # libpq message style always ends with a newline; the pg gem's internal
-              # errors do not. We separate these cases because a pg-internal
-              # ConnectionBad means it failed before it managed to send the query,
-              # whereas a libpq failure could have occurred at any time (meaning the
-              # server may have already executed part or all of the query).
-              if exception.message.end_with?("\n")
-                ConnectionFailed.new(exception)
-              else
-                ConnectionNotEstablished.new(exception)
-              end
             else
               super
             end
@@ -725,13 +727,6 @@ module ActiveRecord
           end
         end
 
-        def retryable_query_error?(exception)
-          # We cannot retry anything if we're inside a broken transaction; we need to at
-          # least raise until the innermost savepoint is rolled back
-          @raw_connection&.transaction_status != ::PG::PQTRANS_INERROR &&
-            super
-        end
-
         def get_oid_type(oid, fmod, column_name, sql_type = "")
           if !type_map.key?(oid)
             load_additional_types([oid])
@@ -748,7 +743,7 @@ module ActiveRecord
         def load_additional_types(oids = nil)
           initializer = OID::TypeMapInitializer.new(type_map)
           load_types_queries(initializer, oids) do |query|
-            execute_and_clear(query, "SCHEMA", [], allow_retry: true, uses_transaction: false) do |records|
+            execute_and_clear(query, "SCHEMA", []) do |records|
               initializer.run(records)
             end
           end
@@ -771,14 +766,14 @@ module ActiveRecord
 
         FEATURE_NOT_SUPPORTED = "0A000" # :nodoc:
 
-        def execute_and_clear(sql, name, binds, prepare: false, async: false, allow_retry: false, uses_transaction: true)
+        def execute_and_clear(sql, name, binds, prepare: false, async: false)
           sql = transform_query(sql)
           check_if_write_query(sql)
 
           if !prepare || without_prepared_statement?(binds)
-            result = exec_no_cache(sql, name, binds, async: async, allow_retry: allow_retry, uses_transaction: uses_transaction)
+            result = exec_no_cache(sql, name, binds, async: async)
           else
-            result = exec_cache(sql, name, binds, async: async, allow_retry: allow_retry, uses_transaction: uses_transaction)
+            result = exec_cache(sql, name, binds, async: async)
           end
           begin
             ret = yield result
@@ -788,7 +783,8 @@ module ActiveRecord
           ret
         end
 
-        def exec_no_cache(sql, name, binds, async:, allow_retry:, uses_transaction:)
+        def exec_no_cache(sql, name, binds, async: false)
+          materialize_transactions
           mark_transaction_written_if_write(sql)
 
           # make sure we carry over any changes to ActiveRecord.default_timezone that have been
@@ -797,23 +793,23 @@ module ActiveRecord
 
           type_casted_binds = type_casted_binds(binds)
           log(sql, name, binds, type_casted_binds, async: async) do
-            with_raw_connection do |conn|
-              conn.exec_params(sql, type_casted_binds)
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              @raw_connection.exec_params(sql, type_casted_binds)
             end
           end
         end
 
-        def exec_cache(sql, name, binds, async:, allow_retry:, uses_transaction:)
+        def exec_cache(sql, name, binds, async: false)
+          materialize_transactions
           mark_transaction_written_if_write(sql)
-
           update_typemap_for_default_timezone
 
           stmt_key = prepare_statement(sql, binds)
           type_casted_binds = type_casted_binds(binds)
 
           log(sql, name, binds, type_casted_binds, stmt_key, async: async) do
-            with_raw_connection do |conn|
-              conn.exec_prepared(stmt_key, type_casted_binds)
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              @raw_connection.exec_prepared(stmt_key, type_casted_binds)
             end
           end
         rescue ActiveRecord::StatementInvalid => e
@@ -862,17 +858,17 @@ module ActiveRecord
         # Prepare the statement if it hasn't been prepared, return
         # the statement key.
         def prepare_statement(sql, binds)
-          with_raw_connection(allow_retry: true, uses_transaction: false) do |conn|
+          @lock.synchronize do
             sql_key = sql_key(sql)
             unless @statements.key? sql_key
               nextkey = @statements.next_key
               begin
-                conn.prepare nextkey, sql
+                @raw_connection.prepare nextkey, sql
               rescue => e
                 raise translate_exception_class(e, sql, binds)
               end
               # Clear the queue
-              conn.get_last_result
+              @raw_connection.get_last_result
               @statements[sql_key] = nextkey
             end
             @statements[sql_key]
@@ -883,12 +879,6 @@ module ActiveRecord
         # connected server's characteristics.
         def connect
           @raw_connection = self.class.new_client(@connection_parameters)
-        end
-
-        def reconnect
-          @raw_connection.reset
-        rescue PG::ConnectionBad
-          connect
         end
 
         # Configures the encoding, verbosity, schema search path, and time zone of the connection.
@@ -906,16 +896,16 @@ module ActiveRecord
           variables = @config.fetch(:variables, {}).stringify_keys
 
           # Set interval output format to ISO 8601 for ease of parsing by ActiveSupport::Duration.parse
-          internal_execute("SET intervalstyle = iso_8601")
+          execute("SET intervalstyle = iso_8601", "SCHEMA")
 
           # SET statements from :variables config hash
           # https://www.postgresql.org/docs/current/static/sql-set.html
           variables.map do |k, v|
             if v == ":default" || v == :default
               # Sets the value to the global or compile default
-              internal_execute("SET SESSION #{k} TO DEFAULT")
+              execute("SET SESSION #{k} TO DEFAULT", "SCHEMA")
             elsif !v.nil?
-              internal_execute("SET SESSION #{k} TO #{quote(v)}")
+              execute("SET SESSION #{k} TO #{quote(v)}", "SCHEMA")
             end
           end
 
@@ -936,9 +926,9 @@ module ActiveRecord
           # If using Active Record's time zone support configure the connection
           # to return TIMESTAMP WITH ZONE types in UTC.
           if default_timezone == :utc
-            internal_execute("SET SESSION timezone TO 'UTC'")
+            execute("SET SESSION timezone TO 'UTC'", "SCHEMA")
           else
-            internal_execute("SET SESSION timezone TO DEFAULT")
+            execute("SET SESSION timezone TO DEFAULT", "SCHEMA")
           end
         end
 
@@ -986,7 +976,7 @@ module ActiveRecord
         end
 
         def build_statement_pool
-          StatementPool.new(self, self.class.type_cast_config_to_integer(@config[:statement_limit]))
+          StatementPool.new(@raw_connection, self.class.type_cast_config_to_integer(@config[:statement_limit]))
         end
 
         def can_perform_case_insensitive_comparison_for?(column)
@@ -1005,7 +995,7 @@ module ActiveRecord
                   AND castsource = #{quote column.sql_type}::regtype
               )
             SQL
-            execute_and_clear(sql, "SCHEMA", [], allow_retry: true, uses_transaction: false) do |result|
+            execute_and_clear(sql, "SCHEMA", []) do |result|
               result.getvalue(0, 0)
             end
           end
@@ -1059,7 +1049,7 @@ module ActiveRecord
             FROM pg_type as t
             WHERE t.typname IN (%s)
           SQL
-          coders = execute_and_clear(query, "SCHEMA", [], allow_retry: true, uses_transaction: false) do |result|
+          coders = execute_and_clear(query, "SCHEMA", []) do |result|
             result.filter_map { |row| construct_coder(row, coders_by_name[row["typname"]]) }
           end
 

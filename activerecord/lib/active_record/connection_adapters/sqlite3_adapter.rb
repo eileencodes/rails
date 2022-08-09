@@ -174,6 +174,17 @@ module ActiveRecord
         !@raw_connection.closed?
       end
 
+      def reconnect!(restore_transactions: false)
+        @lock.synchronize do
+          if active?
+            @raw_connection.rollback rescue nil
+          else
+            connect
+          end
+
+          super
+        end
+      end
       alias :reset! :reconnect!
 
       # Disconnects from the database if already connected. Otherwise, this
@@ -193,7 +204,7 @@ module ActiveRecord
 
       # Returns the current database encoding format as a string, e.g. 'UTF-8'
       def encoding
-        any_raw_connection.encoding.to_s
+        @raw_connection.encoding.to_s
       end
 
       def supports_explain?
@@ -620,14 +631,6 @@ module ActiveRecord
             @config[:database].to_s,
             @config.merge(results_as_hash: true)
           )
-        end
-
-        def reconnect
-          if active?
-            @raw_connection.rollback rescue nil
-          else
-            connect
-          end
         end
 
         def configure_connection

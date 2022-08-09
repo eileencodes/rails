@@ -11,11 +11,12 @@ module ActiveRecord
 
         # Queries the database and returns the results in an Array-like object
         def query(sql, name = nil) # :nodoc:
+          materialize_transactions
           mark_transaction_written_if_write(sql)
 
           log(sql, name) do
-            with_raw_connection do |conn|
-              conn.async_exec(sql).map_types!(@type_map_for_results).values
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              @raw_connection.async_exec(sql).map_types!(@type_map_for_results).values
             end
           end
         end
@@ -39,28 +40,18 @@ module ActiveRecord
           sql = transform_query(sql)
           check_if_write_query(sql)
 
+          materialize_transactions
           mark_transaction_written_if_write(sql)
 
-          with_raw_connection do |conn|
-            log(sql, name) do
-              conn.async_exec(sql)
+          log(sql, name) do
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              @raw_connection.async_exec(sql)
             end
           end
         end
 
-        def internal_execute(sql, name = "SCHEMA", allow_retry: true, uses_transaction: false)
-          sql = transform_query(sql)
-          check_if_write_query(sql)
-
-          with_raw_connection(allow_retry: allow_retry, uses_transaction: uses_transaction) do |conn|
-            log(sql, name) do
-              conn.async_exec(sql)
-            end
-          end
-        end
-
-        def exec_query(sql, name = "SQL", binds = [], prepare: false, async: false, allow_retry: false, uses_transaction: true) # :nodoc:
-          execute_and_clear(sql, name, binds, prepare: prepare, async: async, allow_retry: allow_retry, uses_transaction: uses_transaction) do |result|
+        def exec_query(sql, name = "SQL", binds = [], prepare: false, async: false) # :nodoc:
+          execute_and_clear(sql, name, binds, prepare: prepare, async: async) do |result|
             types = {}
             fields = result.fields
             fields.each_with_index do |fname, i|
@@ -116,27 +107,29 @@ module ActiveRecord
 
         # Begins a transaction.
         def begin_db_transaction # :nodoc:
-          internal_execute("BEGIN", "TRANSACTION")
+          execute("BEGIN", "TRANSACTION")
         end
 
         def begin_isolated_db_transaction(isolation) # :nodoc:
-          internal_execute("BEGIN ISOLATION LEVEL #{transaction_isolation_levels.fetch(isolation)}", "TRANSACTION")
+          execute("BEGIN ISOLATION LEVEL #{transaction_isolation_levels.fetch(isolation)}", "TRANSACTION")
         end
 
         # Commits a transaction.
         def commit_db_transaction # :nodoc:
-          internal_execute("COMMIT", "TRANSACTION", allow_retry: false, uses_transaction: true)
+          execute("COMMIT", "TRANSACTION")
         end
 
         # Aborts a transaction.
         def exec_rollback_db_transaction # :nodoc:
-          cancel_any_running_query
-          internal_execute("ROLLBACK", "TRANSACTION", allow_retry: false, uses_transaction: true)
+          @raw_connection.cancel unless @raw_connection.transaction_status == PG::PQTRANS_IDLE
+          @raw_connection.block
+          execute("ROLLBACK", "TRANSACTION")
         end
 
         def exec_restart_db_transaction # :nodoc:
-          cancel_any_running_query
-          internal_execute("ROLLBACK AND CHAIN", "TRANSACTION", allow_retry: false, uses_transaction: true)
+          @raw_connection.cancel unless @raw_connection.transaction_status == PG::PQTRANS_IDLE
+          @raw_connection.block
+          execute("ROLLBACK AND CHAIN", "TRANSACTION")
         end
 
         # From https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT
@@ -148,13 +141,6 @@ module ActiveRecord
         end
 
         private
-          def cancel_any_running_query
-            return unless @raw_connection && @raw_connection.transaction_status != PG::PQTRANS_IDLE
-            @raw_connection.cancel
-            @raw_connection.block
-          rescue PG::Error
-          end
-
           def execute_batch(statements, name = nil)
             execute(combine_multi_statements(statements))
           end

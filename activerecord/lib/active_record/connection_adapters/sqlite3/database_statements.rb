@@ -24,11 +24,12 @@ module ActiveRecord
           sql = transform_query(sql)
           check_if_write_query(sql)
 
+          materialize_transactions
           mark_transaction_written_if_write(sql)
 
           log(sql, name) do
-            with_raw_connection do |conn|
-              conn.execute(sql)
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+              @raw_connection.execute(sql)
             end
           end
         end
@@ -37,15 +38,16 @@ module ActiveRecord
           sql = transform_query(sql)
           check_if_write_query(sql)
 
+          materialize_transactions
           mark_transaction_written_if_write(sql)
 
           type_casted_binds = type_casted_binds(binds)
 
           log(sql, name, binds, type_casted_binds, async: async) do
-            with_raw_connection do |conn|
+            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
               # Don't cache statements if they are not prepared
               unless prepare
-                stmt = conn.prepare(sql)
+                stmt = @raw_connection.prepare(sql)
                 begin
                   cols = stmt.columns
                   unless without_prepared_statement?(binds)
@@ -56,7 +58,7 @@ module ActiveRecord
                   stmt.close
                 end
               else
-                stmt = @statements[sql] ||= conn.prepare(sql)
+                stmt = @statements[sql] ||= @raw_connection.prepare(sql)
                 cols = stmt.columns
                 stmt.reset!
                 stmt.bind_params(type_casted_binds)
@@ -84,28 +86,16 @@ module ActiveRecord
         end
 
         def begin_db_transaction # :nodoc:
-          log("begin transaction", "TRANSACTION") do
-            with_raw_connection do |conn|
-              conn.transaction
-            end
-          end
+          log("begin transaction", "TRANSACTION") { @raw_connection.transaction }
         end
 
         def commit_db_transaction # :nodoc:
-          log("commit transaction", "TRANSACTION") do
-            with_raw_connection do |conn|
-              conn.commit
-            end
-          end
+          log("commit transaction", "TRANSACTION") { @raw_connection.commit }
           reset_read_uncommitted
         end
 
         def exec_rollback_db_transaction # :nodoc:
-          log("rollback transaction", "TRANSACTION") do
-            with_raw_connection do |conn|
-              conn.rollback
-            end
-          end
+          log("rollback transaction", "TRANSACTION") { @raw_connection.rollback }
           reset_read_uncommitted
         end
 
@@ -131,11 +121,13 @@ module ActiveRecord
             sql = combine_multi_statements(statements)
 
             check_if_write_query(sql)
+
+            materialize_transactions
             mark_transaction_written_if_write(sql)
 
             log(sql, name) do
-              with_raw_connection do |conn|
-                conn.execute_batch2(sql)
+              ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
+                @raw_connection.execute_batch2(sql)
               end
             end
           end
