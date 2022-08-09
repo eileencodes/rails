@@ -10,7 +10,21 @@ module ActiveRecord
   module ConnectionHandling # :nodoc:
     # Establishes a connection to the database that's used by all Active Record objects.
     def mysql2_connection(config)
-      ConnectionAdapters::Mysql2Adapter.new(config)
+      config = config.symbolize_keys
+      config[:flags] ||= 0
+
+      if config[:flags].kind_of? Array
+        config[:flags].push "FOUND_ROWS"
+      else
+        config[:flags] |= Mysql2::Client::FOUND_ROWS
+      end
+
+      ConnectionAdapters::Mysql2Adapter.new(
+        ConnectionAdapters::Mysql2Adapter.new_client(config),
+        logger,
+        nil,
+        config,
+      )
     end
   end
 
@@ -41,25 +55,16 @@ module ActiveRecord
         end
       end
 
-      def initialize(...)
-        super
+      def initialize(connection, logger, connection_options, config)
+        check_prepared_statements_deprecation(config)
+        superclass_config = config.reverse_merge(prepared_statements: false)
+        super(connection, logger, connection_options, superclass_config)
+      end
 
-        @config[:flags] ||= 0
-
-        if @config[:flags].kind_of? Array
-          @config[:flags].push "FOUND_ROWS"
-        else
-          @config[:flags] |= Mysql2::Client::FOUND_ROWS
-        end
-
-        unless @config.key?(:prepared_statements)
-          ActiveSupport::Deprecation.warn(<<-MSG.squish)
-            The default value of `prepared_statements` for the mysql2 adapter will be changed from +false+ to +true+ in Rails 7.2.
-          MSG
-          @config[:prepared_statements] = false
-        end
-
-        @connection_parameters ||= @config
+      def self.database_exists?(config)
+        !!ActiveRecord::Base.mysql2_connection(config)
+      rescue ActiveRecord::NoDatabaseError
+        false
       end
 
       def supports_json?
@@ -115,7 +120,7 @@ module ActiveRecord
       #++
 
       def active?
-        !!@raw_connection&.ping
+        @raw_connection.ping
       end
 
       alias :reset! :reconnect!
@@ -124,23 +129,30 @@ module ActiveRecord
       # Otherwise, this method does nothing.
       def disconnect!
         super
-        @raw_connection&.close
-        @raw_connection = nil
+        @raw_connection.close
       end
 
       def discard! # :nodoc:
         super
-        @raw_connection&.automatic_close = false
+        @raw_connection.automatic_close = false
         @raw_connection = nil
       end
 
       private
+        def check_prepared_statements_deprecation(config)
+          if !config.key?(:prepared_statements)
+            ActiveSupport::Deprecation.warn(<<-MSG.squish)
+              The default value of `prepared_statements` for the mysql2 adapter will be changed from +false+ to +true+ in Rails 7.2.
+            MSG
+          end
+        end
+
         def connect
-          @raw_connection = self.class.new_client(@connection_parameters)
+          @raw_connection = self.class.new_client(@config)
         end
 
         def reconnect
-          @raw_connection&.close
+          @raw_connection.close
           connect
         end
 

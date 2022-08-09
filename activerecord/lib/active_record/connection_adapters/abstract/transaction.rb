@@ -414,6 +414,13 @@ module ActiveRecord
             @has_unmaterialized_transactions = false
           end
         end
+
+        # As a logical simplification for now, we assume anything that requests
+        # materialization is about to dirty the transaction. Note this is just
+        # an assumption about the caller, not a direct property of this method.
+        # It can go away later when callers are able to handle dirtiness for
+        # themselves.
+        dirty_current_transaction
       end
 
       def commit_transaction
@@ -439,12 +446,8 @@ module ActiveRecord
 
       def rollback_transaction(transaction = nil)
         @connection.lock.synchronize do
-          transaction ||= @stack.last
-          begin
-            transaction.rollback
-          ensure
-            @stack.pop if @stack.last == transaction
-          end
+          transaction ||= @stack.pop
+          transaction.rollback
           transaction.rollback_records
         end
       end
@@ -499,9 +502,6 @@ module ActiveRecord
 
                 begin
                   commit_transaction
-                rescue ActiveRecord::ConnectionFailed
-                  transaction.state.invalidate! unless transaction.state.completed?
-                  raise
                 rescue Exception
                   rollback_transaction(transaction) unless transaction.state.completed?
                   raise

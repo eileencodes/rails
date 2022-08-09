@@ -17,7 +17,7 @@ module ActiveRecord
 
       def test_connection_error
         assert_raises ActiveRecord::ConnectionNotEstablished do
-          ActiveRecord::Base.postgresql_connection(host: File::NULL).connect!
+          ActiveRecord::Base.postgresql_connection(host: File::NULL)
         end
       end
 

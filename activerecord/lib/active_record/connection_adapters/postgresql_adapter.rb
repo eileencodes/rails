@@ -23,7 +23,22 @@ module ActiveRecord
   module ConnectionHandling # :nodoc:
     # Establishes a connection to the database that's used by all Active Record objects
     def postgresql_connection(config)
-      ConnectionAdapters::PostgreSQLAdapter.new(config)
+      conn_params = config.symbolize_keys.compact
+
+      # Map ActiveRecords param names to PGs.
+      conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
+      conn_params[:dbname] = conn_params.delete(:database) if conn_params[:database]
+
+      # Forward only valid config params to PG::Connection.connect.
+      valid_conn_param_keys = PG::Connection.conndefaults_hash.keys + [:requiressl]
+      conn_params.slice!(*valid_conn_param_keys)
+
+      ConnectionAdapters::PostgreSQLAdapter.new(
+        ConnectionAdapters::PostgreSQLAdapter.new_client(conn_params),
+        logger,
+        conn_params,
+        config,
+      )
     end
   end
 
@@ -271,31 +286,26 @@ module ActiveRecord
       end
 
       # Initializes and connects a PostgreSQL adapter.
-      def initialize(...)
-        super
-
-        conn_params = @config.compact
-
-        # Map ActiveRecords param names to PGs.
-        conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
-        conn_params[:dbname] = conn_params.delete(:database) if conn_params[:database]
-
-        # Forward only valid config params to PG::Connection.connect.
-        valid_conn_param_keys = PG::Connection.conndefaults_hash.keys + [:requiressl]
-        conn_params.slice!(*valid_conn_param_keys)
-
-        @connection_parameters = conn_params
+      def initialize(connection, logger, connection_parameters, config)
+        @connection_parameters = connection_parameters || {}
 
         @max_identifier_length = nil
         @type_map = nil
 
+        super(connection, logger, config)
+
         @use_insert_returning = @config.key?(:insert_returning) ? self.class.type_cast_config_to_boolean(@config[:insert_returning]) : true
+      end
+
+      def self.database_exists?(config)
+        !!ActiveRecord::Base.postgresql_connection(config)
+      rescue ActiveRecord::NoDatabaseError
+        false
       end
 
       # Is this connection alive and ready for queries?
       def active?
         @lock.synchronize do
-          return false unless @raw_connection
           @raw_connection.query ";"
         end
         true
@@ -317,8 +327,6 @@ module ActiveRecord
 
       def reset!
         @lock.synchronize do
-          return connect! unless @raw_connection
-
           unless @raw_connection.transaction_status == ::PG::PQTRANS_IDLE
             @raw_connection.query "ROLLBACK"
           end
@@ -333,14 +341,13 @@ module ActiveRecord
       def disconnect!
         @lock.synchronize do
           super
-          @raw_connection&.close rescue nil
-          @raw_connection = nil
+          @raw_connection.close rescue nil
         end
       end
 
       def discard! # :nodoc:
         super
-        @raw_connection&.socket_io&.reopen(IO::NULL) rescue nil
+        @raw_connection.socket_io.reopen(IO::NULL) rescue nil
         @raw_connection = nil
       end
 
@@ -879,13 +886,9 @@ module ActiveRecord
         end
 
         def reconnect
-          begin
-            @raw_connection&.reset
-          rescue PG::ConnectionBad
-            @raw_connection = nil
-          end
-
-          connect unless @raw_connection
+          @raw_connection.reset
+        rescue PG::ConnectionBad
+          connect
         end
 
         # Configures the encoding, verbosity, schema search path, and time zone of the connection.
@@ -1017,7 +1020,7 @@ module ActiveRecord
         end
 
         def update_typemap_for_default_timezone
-          if @raw_connection && @mapped_default_timezone != default_timezone && @timestamp_decoder
+          if @mapped_default_timezone != default_timezone && @timestamp_decoder
             decoder_class = default_timezone == :utc ?
               PG::TextDecoder::TimestampUtc :
               PG::TextDecoder::TimestampWithoutTimeZone
@@ -1030,8 +1033,6 @@ module ActiveRecord
             # if default timezone has changed, we need to reconfigure the connection
             # (specifically, the session time zone)
             reconfigure_connection_timezone
-
-            true
           end
         end
 

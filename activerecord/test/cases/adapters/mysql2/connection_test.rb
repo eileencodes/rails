@@ -52,16 +52,21 @@ class Mysql2ConnectionTest < ActiveRecord::Mysql2TestCase
     assert_predicate @connection, :active?
   end
 
-  def test_execute_after_disconnect_reconnects
+  def test_execute_after_disconnect
     @connection.disconnect!
 
-    assert_equal 3, @connection.select_value("SELECT 1+2")
+    error = assert_raise(ActiveRecord::ConnectionNotEstablished) do
+      @connection.execute("SELECT 1")
+    end
+    assert_kind_of Mysql2::Error, error.cause
   end
 
-  def test_quote_after_disconnect_reconnects
+  def test_quote_after_disconnect
     @connection.disconnect!
 
-    assert_equal "'string'", @connection.quote("string")
+    assert_raise(ActiveRecord::ConnectionNotEstablished) do
+      @connection.quote("string")
+    end
   end
 
   def test_active_after_disconnect

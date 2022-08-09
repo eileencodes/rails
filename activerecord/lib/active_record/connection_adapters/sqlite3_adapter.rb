@@ -16,7 +16,35 @@ require "sqlite3"
 module ActiveRecord
   module ConnectionHandling # :nodoc:
     def sqlite3_connection(config)
-      ConnectionAdapters::SQLite3Adapter.new(config)
+      config = config.symbolize_keys
+
+      # Require database.
+      unless config[:database]
+        raise ArgumentError, "No database file specified. Missing argument: database"
+      end
+
+      # Allow database path relative to Rails.root, but only if the database
+      # path is not the special path that tells sqlite to build a database only
+      # in memory.
+      if ":memory:" != config[:database] && !config[:database].to_s.start_with?("file:")
+        config[:database] = File.expand_path(config[:database], Rails.root) if defined?(Rails.root)
+        dirname = File.dirname(config[:database])
+        Dir.mkdir(dirname) unless File.directory?(dirname)
+      end
+
+      config[:strict] = ConnectionAdapters::SQLite3Adapter.strict_strings_by_default unless config.key?(:strict)
+      db = SQLite3::Database.new(
+        config[:database].to_s,
+        config.merge(results_as_hash: true)
+      )
+
+      ConnectionAdapters::SQLite3Adapter.new(db, logger, nil, config)
+    rescue Errno::ENOENT => error
+      if error.message.include?("No such file or directory")
+        raise ActiveRecord::NoDatabaseError
+      else
+        raise
+      end
     end
   end
 
@@ -29,18 +57,6 @@ module ActiveRecord
     # * <tt>:database</tt> - Path to the database file.
     class SQLite3Adapter < AbstractAdapter
       ADAPTER_NAME = "SQLite"
-
-      class << self
-        def new_client(config)
-          ::SQLite3::Database.new(config[:database].to_s, config)
-        rescue Errno::ENOENT => error
-          if error.message.include?("No such file or directory")
-            raise ActiveRecord::NoDatabaseError
-          else
-            raise
-          end
-        end
-      end
 
       include SQLite3::Quoting
       include SQLite3::SchemaStatements
@@ -80,39 +96,19 @@ module ActiveRecord
           end
       end
 
-      def initialize(...)
-        super
-
-        @memory_database = false
-        case @config[:database].to_s
-        when ""
-          raise ArgumentError, "No database file specified. Missing argument: database"
-        when ":memory:"
-          @memory_database = true
-        when /\Afile:/
-        else
-          # Otherwise we have a path relative to Rails.root
-          @config[:database] = File.expand_path(@config[:database], Rails.root) if defined?(Rails.root)
-          dirname = File.dirname(@config[:database])
-          unless File.directory?(dirname)
-            begin
-              Dir.mkdir(dirname)
-            rescue Errno::ENOENT => error
-              if error.message.include?("No such file or directory")
-                raise ActiveRecord::NoDatabaseError
-              else
-                raise
-              end
-            end
-          end
-        end
-
-        @config[:strict] = ConnectionAdapters::SQLite3Adapter.strict_strings_by_default unless @config.key?(:strict)
-        @connection_parameters = @config.merge(database: @config[:database].to_s, results_as_hash: true)
+      def initialize(connection, logger, connection_options, config)
+        @memory_database = config[:database] == ":memory:"
+        super(connection, logger, config)
       end
 
-      def database_exists?
-        @config[:database] == ":memory:" || File.exist?(@config[:database].to_s)
+      def self.database_exists?(config)
+        config = config.symbolize_keys
+        if config[:database] == ":memory:"
+          true
+        else
+          database_file = defined?(Rails.root) ? File.expand_path(config[:database], Rails.root) : config[:database]
+          File.exist?(database_file)
+        end
       end
 
       def supports_ddl_transactions?
@@ -175,7 +171,7 @@ module ActiveRecord
       end
 
       def active?
-        @raw_connection && !@raw_connection.closed?
+        !@raw_connection.closed?
       end
 
       alias :reset! :reconnect!
@@ -184,9 +180,7 @@ module ActiveRecord
       # method does nothing.
       def disconnect!
         super
-
-        @raw_connection&.close rescue nil
-        @raw_connection = nil
+        @raw_connection.close rescue nil
       end
 
       def supports_index_sort_order?
@@ -622,7 +616,10 @@ module ActiveRecord
         end
 
         def connect
-          @raw_connection = self.class.new_client(@connection_parameters)
+          @raw_connection = ::SQLite3::Database.new(
+            @config[:database].to_s,
+            @config.merge(results_as_hash: true)
+          )
         end
 
         def reconnect
