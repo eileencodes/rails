@@ -1,3 +1,9 @@
+*   Move `ActiveRecord::SchemaMigration` to an indpendent object.
+
+    `ActiveRecord::SchemaMigration` no longer inherits from `ActiveRecord::Base` and is now an independent object that should be instantiated with a `connection`. This class is private and should not be used by applications directly. If you want to interact with the schema migrations table, please access it on the connection directly, for example: `ActiveRecord::Base.connection.schema_migration`.
+
+    *Eileen M. Uchitelle*
+
 *   Adapts virtual attributes on `ActiveRecord::Persistence#becomes`.
 
     When source and target classes have a different set of attributes adapts
