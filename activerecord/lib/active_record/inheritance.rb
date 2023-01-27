@@ -53,7 +53,7 @@ module ActiveRecord
       # and if the inheritance column is attr accessible, it initializes an
       # instance of the given subclass instead of the base class.
       def new(attributes = nil, &block)
-        if abstract_class? || self == Base
+        if cannot_be_instantiated?
           raise NotImplementedError, "#{self} is an abstract class and cannot be instantiated."
         end
 
@@ -155,6 +155,10 @@ module ActiveRecord
       # Returns whether this class is an abstract class or not.
       def abstract_class?
         defined?(@abstract_class) && @abstract_class == true
+      end
+
+      def cannot_be_instantiated? # :nodoc:
+        abstract_class? || self == ActiveRecord::Base
       end
 
       # Sets the application record class for Active Record

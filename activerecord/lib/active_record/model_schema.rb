@@ -246,6 +246,10 @@ module ActiveRecord
       #     self.table_name = "mice"
       #   end
       def table_name
+        # we hit reset every time we have an abstract
+        # because it's 99% of the time nil.
+        # i could deprecate middle abstract classes and force
+        # inheritance?
         reset_table_name unless defined?(@table_name)
         @table_name
       end
@@ -278,7 +282,12 @@ module ActiveRecord
       # Computes the table name, (re)sets it internally, and returns it.
       def reset_table_name # :nodoc:
         self.table_name = if abstract_class?
-          superclass == Base ? nil : superclass.table_name
+                            if superclass == Base
+                              nil
+                            else
+                              raise "oh hi"
+                              superclass.table_name
+                            end
         elsif superclass.abstract_class?
           superclass.table_name || compute_table_name
         else

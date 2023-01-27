@@ -38,6 +38,15 @@ module ActiveRecord
       delegate :options, to: :reflection
 
       def initialize(owner, reflection)
+        if owner.class.cannot_be_instantiated?
+          ActiveRecord.deprecator.warn(<<-MSG.squish)
+            #{self.owner.class} is an abstract class and associations
+            it will not be able to be instantiated in future versions.
+            Move the association declaration to a concern or a model
+            part of the STI heirarchy."
+          MSG
+        end
+
         reflection.check_validity!
 
         @owner, @reflection = owner, reflection
