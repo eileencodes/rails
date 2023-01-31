@@ -748,15 +748,18 @@ module ActiveRecord
         end
       end
 
+      def query_constraints_list(klass = nil)
+        (klass || self.klass).query_constraints_list
+      end
+
       # klass option is necessary to support loading polymorphic associations
       def association_primary_key(klass = nil)
-        if primary_key = options[:primary_key]
-          @association_primary_key ||= if primary_key.is_a?(Array)
-            # composite foreign keys support
-            Array(primary_key).map(&:to_s).freeze
-          else
-            -primary_key.to_s
-          end
+        if query_constraints_list(klass).size > 1
+          x = query_constraints_list(klass).map { |key| key.to_s.freeze }.freeze
+          p x
+          x
+        elsif primary_key = options[:primary_key]
+          -primary_key.to_s
         else
           primary_key(klass || self.klass)
         end
