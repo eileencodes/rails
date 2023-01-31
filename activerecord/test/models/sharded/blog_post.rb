@@ -3,8 +3,9 @@
 module Sharded
   class BlogPost < ActiveRecord::Base
     self.table_name = :sharded_blog_posts
+    query_constraints :id, :blog_id
 
     belongs_to :blog
-    has_many :comments, foreign_key: [:blog_id, :blog_post_id], primary_key: [:blog_id, :id]
+    has_many :comments, foreign_key: [:blog_id, :blog_post_id]
   end
 end

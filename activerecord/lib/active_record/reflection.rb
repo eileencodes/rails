@@ -516,12 +516,7 @@ module ActiveRecord
       end
 
       def join_id_for(owner) # :nodoc:
-        if join_foreign_key.is_a?(Array)
-          # composite foreign keys support
-          join_foreign_key.map { |key| owner[key] }
-        else
-          [owner[join_foreign_key]]
-        end
+        Array(join_foreign_key).map { |key| owner[key] }
       end
 
       def through_reflection

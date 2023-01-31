@@ -131,12 +131,7 @@ module ActiveRecord
         end
 
         def foreign_key_present?
-          if reflection.foreign_key.is_a?(Array)
-            # composite foreign keys branch
-            reflection.foreign_key.all? { |fk| owner._read_attribute(fk) }
-          else
-            owner._read_attribute(reflection.foreign_key)
-          end
+          Array(reflection.foreign_key).all? { |fk| owner._read_attribute(fk) }
         end
 
         def invertible_for?(record)
