@@ -34,7 +34,6 @@ require "models/shipping_line"
 require "models/essay"
 require "models/member"
 require "models/membership"
-require "models/clothing_item"
 require "models/sharded/blog"
 require "models/sharded/blog_post"
 require "models/sharded/comment"
@@ -43,7 +42,7 @@ require "models/sharded/comment"
 class AssociationsTest < ActiveRecord::TestCase
   fixtures :accounts, :companies, :developers, :projects, :developers_projects,
            :computers, :people, :readers, :authors, :author_addresses, :author_favorites,
-           :comments, :posts, :clothing_items, :sharded_blogs, :sharded_blog_posts, :sharded_comments
+           :comments, :posts, :sharded_blogs, :sharded_blog_posts, :sharded_comments
 
   def test_eager_loading_should_not_change_count_of_children
     liquid = Liquid.create(name: "salty")
