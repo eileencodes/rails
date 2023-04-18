@@ -138,7 +138,6 @@ module ActiveRecord
           return mode if mode.is_a? Integer
 
           m = mode.to_s.upcase
-          # enable Mysql2 client compatibility
           m = "SSL_MODE_#{m}" unless m.start_with? "SSL_MODE_"
 
           SSL_MODES.fetch(m.to_sym, mode)

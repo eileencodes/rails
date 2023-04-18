@@ -19,11 +19,15 @@ module ActiveRecord
 
       ##
       # :singleton-method:
-      # By default, the Mysql2Adapter will consider all columns of type <tt>tinyint(1)</tt>
+      # By default, the MySQL adapters will consider all columns of type <tt>tinyint(1)</tt>
       # as boolean. If you wish to disable this emulation you can add the following line
-      # to your application.rb file:
+      # to your application.rb file for mysql2:
       #
       #   ActiveRecord::ConnectionAdapters::Mysql2Adapter.emulate_booleans = false
+      #
+      # Or for trilogy:
+      #
+      #   ActiveRecord::ConnectionAdapters::TrilogyAdapter.emulate_booleans = false
       class_attribute :emulate_booleans, default: true
 
       NATIVE_DATABASE_TYPES = {
@@ -232,7 +236,7 @@ module ActiveRecord
         raw_execute(sql, name, async: async, allow_retry: allow_retry)
       end
 
-      # Mysql2Adapter doesn't have to free a result after using it, but we use this method
+      # The MySQL adapters don't have to free a result after using it, but we use this method
       # to write stuff in an abstract way without concerning ourselves about whether it
       # needs to be explicitly freed or not.
       def execute_and_free(sql, name = nil, async: false) # :nodoc:

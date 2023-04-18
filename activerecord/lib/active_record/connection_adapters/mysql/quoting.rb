@@ -62,8 +62,8 @@ module ActiveRecord
           end
         end
 
-        # Override +type_cast+ we pass to mysql2 Date and Time objects instead
-        # of Strings since mysql2 is able to handle those classes more efficiently.
+        # Override the +type_cast+ value we pass to MySQL adapters Date and Time objects instead
+        # of Strings since the MySQL adapters are able to handle those classes more efficiently.
         def type_cast(value) # :nodoc:
           case value
           when ActiveSupport::TimeWithZone
