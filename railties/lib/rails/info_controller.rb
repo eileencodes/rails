@@ -18,6 +18,24 @@ class Rails::InfoController < Rails::ApplicationController # :nodoc:
     @page_title = "Properties"
   end
 
+  def models
+  end
+
+  # /columns.json?model=Post
+  def columns
+    columns = params[:model].constantize.columns.map { |column| [column.name.to_s, column.type.to_s] }
+
+    respond_to do |format|
+      format.json { render json: columns }
+    end
+  rescue
+    head :not_found
+  end
+
+  def refresh
+    ## hit this
+  end
+
   def routes
     if query = params[:query]
       query = URI::DEFAULT_PARSER.escape query
@@ -26,6 +44,21 @@ class Rails::InfoController < Rails::ApplicationController # :nodoc:
         exact: matching_routes(query: query, exact_match: true),
         fuzzy: matching_routes(query: query, exact_match: false)
       }
+    elsif query = params[:helper_info]
+      route = Rails.application.routes.named_routes.get(query)
+
+      if route
+        controller = route.requirements[:controller]
+        action = route.requirements[:action]
+
+        render json: {
+          action: action,
+          controller: controller,
+          path: route.path.spec.to_s
+        }
+      else
+        head :not_found
+      end
     else
       @routes_inspector = ActionDispatch::Routing::RoutesInspector.new(_routes.routes)
       @page_title = "Routes"
