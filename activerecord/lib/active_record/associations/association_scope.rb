@@ -55,9 +55,16 @@ module ActiveRecord
           Arel::Nodes::LeadingJoin.new(table, Arel::Nodes::On.new(constraint))
         end
 
+        # pk is fk and fk is pk here
         def last_chain_scope(scope, reflection, owner)
           primary_key = Array(reflection.join_primary_key)
           foreign_key = Array(reflection.join_foreign_key)
+          p reflection
+          p pk: primary_key
+          p fk: foreign_key
+
+          # we have the pk as an fk, need to turn the fk into a double
+          #primary_key = reflection.build_inferred_query_constraints(owner, foreign_key, primary_key)
 
           table = reflection.aliased_table
           primary_key_foreign_key_pairs = primary_key.zip(foreign_key)
@@ -81,6 +88,10 @@ module ActiveRecord
         def next_chain_scope(scope, reflection, next_reflection)
           primary_key = Array(reflection.join_primary_key)
           foreign_key = Array(reflection.join_foreign_key)
+          p pk2: primary_key
+          p fk2: foreign_key
+
+          #primary_key = reflection.build_inferred_query_constraints(owner, foreign_key, primary_key)
 
           table = reflection.aliased_table
           foreign_table = next_reflection.aliased_table

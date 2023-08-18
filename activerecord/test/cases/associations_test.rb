@@ -4,6 +4,7 @@ require "pp"
 require "cases/helper"
 require "models/computer"
 require "models/developer"
+require "models/mentor"
 require "models/project"
 require "models/company"
 require "models/categorization"
@@ -175,6 +176,11 @@ class AssociationsTest < ActiveRecord::TestCase
 
     expected_posts = [sharded_blog_posts(:great_post_blog_one), sharded_blog_posts(:great_post_blog_two)]
     assert_equal(expected_posts.map(&:id).sort, blog_posts.map(&:id).sort)
+  end
+
+  def test_a_thing
+    # has_many comments. let's try to get the qc from there
+    p Sharded::BlogPost.first.comments.to_sql
   end
 
   def test_querying_by_single_associated_record_works_using_query_constraints

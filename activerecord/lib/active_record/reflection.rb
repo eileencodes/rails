@@ -331,6 +331,26 @@ module ActiveRecord
         message << " named `:#{name}` cannot be lazily loaded."
       end
 
+      def build_inferred_query_constraints(owner, primary_key, foreign_key)
+        return foreign_key unless primary_key.size == 2
+        owner_pk = owner.class.primary_key
+
+        first, last = primary_key
+        qc = if first == owner_pk
+          p "should never be here"
+          [foreign_key.first, last.to_s]
+        elsif last == owner_pk
+          p "should also never be here"
+          [first.to_s, foreign_key.first]
+        else
+          p "in else #{foreign_key}"
+          foreign_key
+        end
+
+        qc
+      end
+
+
       protected
         def actual_source_reflection # FIXME: this is a horrible name
           self
@@ -500,7 +520,6 @@ module ActiveRecord
 
       def foreign_key(infer_from_inverse_of: true)
         @foreign_key ||= if options[:query_constraints]
-          # composite foreign keys support
           options[:query_constraints].map { |fk| fk.to_s.freeze }.freeze
         else
           -(options[:foreign_key]&.to_s || derive_foreign_key(infer_from_inverse_of: infer_from_inverse_of))
@@ -523,8 +542,8 @@ module ActiveRecord
           else
             custom_primary_key.to_s.freeze
           end
-        elsif options[:query_constraints]
-          active_record.query_constraints_list
+        elsif qc = active_record.query_constraints_list
+          qc
         else
           primary_key(active_record).freeze
         end
