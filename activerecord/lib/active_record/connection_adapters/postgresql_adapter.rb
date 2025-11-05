@@ -419,6 +419,7 @@ module ActiveRecord
         end
       end
 
+      # Use standard-conforming strings so we don't have to do the E'...' dance.
       def set_standard_conforming_strings
         internal_execute("SET standard_conforming_strings = on", "SCHEMA")
       end
@@ -976,39 +977,8 @@ module ActiveRecord
         def configure_connection
           super
 
-          if @config[:encoding]
-            @raw_connection.set_client_encoding(@config[:encoding])
-          end
-          self.client_min_messages = @config[:min_messages] || "warning"
-          self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
-
-          unless ActiveRecord.db_warnings_action.nil?
-            @raw_connection.set_notice_receiver do |result|
-              message = result.error_field(PG::Result::PG_DIAG_MESSAGE_PRIMARY)
-              code = result.error_field(PG::Result::PG_DIAG_SQLSTATE)
-              level = result.error_field(PG::Result::PG_DIAG_SEVERITY)
-              @notice_receiver_sql_warnings << SQLWarning.new(message, code, level, nil, @pool)
-            end
-          end
-
-          # Use standard-conforming strings so we don't have to do the E'...' dance.
-          set_standard_conforming_strings
-
-          variables = @config.fetch(:variables, {}).stringify_keys
-
-          # Set interval output format to ISO 8601 for ease of parsing by ActiveSupport::Duration.parse
-          internal_execute("SET intervalstyle = iso_8601", "SCHEMA")
-
-          # SET statements from :variables config hash
-          # https://www.postgresql.org/docs/current/static/sql-set.html
-          variables.map do |k, v|
-            if v == ":default" || v == :default
-              # Sets the value to the global or compile default
-              internal_execute("SET SESSION #{k} TO DEFAULT", "SCHEMA")
-            elsif !v.nil?
-              internal_execute("SET SESSION #{k} TO #{quote(v)}", "SCHEMA")
-            end
-          end
+          configure_settings unless @config[:skip_autoconfigure]
+          configure_warnings
 
           add_pg_encoders
           add_pg_decoders
@@ -1203,6 +1173,74 @@ module ActiveRecord
         ActiveRecord::Type.register(:uuid, OID::Uuid, adapter: :postgresql)
         ActiveRecord::Type.register(:vector, OID::Vector, adapter: :postgresql)
         ActiveRecord::Type.register(:xml, OID::Xml, adapter: :postgresql)
+
+        private
+          def configure_settings
+            set_encoding
+            set_standard_conforming_strings
+            set_intervalstyle
+            set_client_min_messages
+            set_schema_search_path
+            set_variables
+          end
+
+          def set_intervalstyle
+            # Set interval output format to ISO 8601 for ease of parsing by ActiveSupport::Duration.parse
+            internal_execute("SET intervalstyle = iso_8601", "SCHEMA")
+          end
+
+          def set_encoding
+            encoding = @config[:encoding]
+
+            return unless encoding
+
+            @raw_connection.set_client_encoding(encoding)
+          end
+
+          def set_client_min_messages
+            min_messages = @config[:min_messages]
+
+            return if min_messages == false
+
+            self.client_min_messages = min_messages || "warning"
+          end
+
+          def set_schema_search_path
+            search_path = @config[:schema_search_path]
+            search_order = @config[:schema_order]
+
+            return if search_path == false && search_order == false
+
+            self.schema_search_path = search_path || search_order
+          end
+
+          def set_variables
+            variables = @config.fetch(:variables, {}).stringify_keys
+            return if variables == false
+
+            # SET statements from :variables config hash
+            # https://www.postgresql.org/docs/current/static/sql-set.html
+            variables.map do |k, v|
+              if v == ":default" || v == :default
+                # Sets the value to the global or compile default
+                internal_execute("SET SESSION #{k} TO DEFAULT", "SCHEMA")
+              elsif !v.nil?
+                internal_execute("SET SESSION #{k} TO #{quote(v)}", "SCHEMA")
+              end
+            end
+          end
+
+          def configure_warnings
+            unless ActiveRecord.db_warnings_action.nil?
+              @raw_connection.set_notice_receiver do |result|
+                message = result.error_field(PG::Result::PG_DIAG_MESSAGE_PRIMARY)
+                code = result.error_field(PG::Result::PG_DIAG_SQLSTATE)
+                level = result.error_field(PG::Result::PG_DIAG_SEVERITY)
+                @notice_receiver_sql_warnings << SQLWarning.new(message, code, level, nil, @pool)
+              end
+            end
+          end
+
     end
     ActiveSupport.run_load_hooks(:active_record_postgresqladapter, PostgreSQLAdapter)
   end

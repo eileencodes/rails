@@ -876,24 +876,45 @@ module ActiveRecord
         end
 
         def configure_connection
-          if @config[:timeout]
-            timeout = self.class.type_cast_config_to_integer(@config[:timeout])
-            raise TypeError, "timeout must be integer, not #{timeout}" unless timeout.is_a?(Integer)
-            @raw_connection.busy_handler_timeout = timeout
-          end
+          return super if @config[:skip_autoconfig]
 
-          super
-
-          pragmas = @config.fetch(:pragmas, {}).stringify_keys
-          DEFAULT_PRAGMAS.merge(pragmas).each do |pragma, value|
-            if ::SQLite3::Pragmas.method_defined?("#{pragma}=")
-              @raw_connection.public_send("#{pragma}=", value)
-            else
-              warn "Unknown SQLite pragma: #{pragma}"
-            end
+          configure_settings do
+            super
           end
         end
+
+        private
+          def configure_settings(&block)
+            set_timeout
+            yield
+            set_pragmas
+          end
+
+          def set_timeout
+            timeout = @config[:timeout]
+
+            return unless timeout
+
+            cast_timeout = self.class.type_cast_config_to_integer(timeout)
+            raise TypeError, "timeout must be integer, not #{cast_timeout}" unless cast_timeout.is_a?(Integer)
+            @raw_connection.busy_handler_timeout = cast_timeout
+          end
+
+          def set_pragmas
+            pragmas = @config.fetch(:pragmas, {}).stringify_keys
+
+            return if pragmas == false
+
+            DEFAULT_PRAGMAS.merge(pragmas).each do |pragma, value|
+              if ::SQLite3::Pragmas.method_defined?("#{pragma}=")
+                @raw_connection.public_send("#{pragma}=", value)
+              else
+                warn "Unknown SQLite pragma: #{pragma}"
+              end
+            end
+          end
     end
+
     ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, SQLite3Adapter)
   end
 end

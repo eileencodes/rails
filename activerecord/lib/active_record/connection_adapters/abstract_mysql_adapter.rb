@@ -939,56 +939,6 @@ module ActiveRecord
           end
         end
 
-        def configure_connection
-          super
-          variables = @config.fetch(:variables, {}).stringify_keys
-
-          # Increase timeout so the server doesn't disconnect us.
-          wait_timeout = self.class.type_cast_config_to_integer(@config[:wait_timeout])
-          wait_timeout = 2147483 unless wait_timeout.is_a?(Integer)
-          variables["wait_timeout"] = wait_timeout
-
-          defaults = [":default", :default].to_set
-
-          # Make MySQL reject illegal values rather than truncating or blanking them, see
-          # https://dev.mysql.com/doc/refman/en/sql-mode.html#sqlmode_strict_all_tables
-          # If the user has provided another value for sql_mode, don't replace it.
-          if sql_mode = variables.delete("sql_mode")
-            sql_mode = quote(sql_mode)
-          elsif !defaults.include?(strict_mode?)
-            if strict_mode?
-              sql_mode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')"
-            else
-              sql_mode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')"
-              sql_mode = "REPLACE(#{sql_mode}, 'STRICT_ALL_TABLES', '')"
-              sql_mode = "REPLACE(#{sql_mode}, 'TRADITIONAL', '')"
-            end
-            sql_mode = "CONCAT(#{sql_mode}, ',NO_AUTO_VALUE_ON_ZERO')"
-          end
-          sql_mode_assignment = "@@SESSION.sql_mode = #{sql_mode}, " if sql_mode
-
-          # NAMES does not have an equals sign, see
-          # https://dev.mysql.com/doc/refman/en/set-names.html
-          # (trailing comma because variable_assignments will always have content)
-          if @config[:encoding]
-            encoding = +"NAMES #{@config[:encoding]}"
-            encoding << " COLLATE #{@config[:collation]}" if @config[:collation]
-            encoding << ", "
-          end
-
-          # Gather up all of the SET variables...
-          variable_assignments = variables.filter_map do |k, v|
-            if defaults.include?(v)
-              "@@SESSION.#{k} = DEFAULT" # Sets the value to the global or compile default
-            elsif !v.nil?
-              "@@SESSION.#{k} = #{quote(v)}"
-            end
-          end.join(", ")
-
-          # ...and send them all in one query
-          raw_execute("SET #{encoding} #{sql_mode_assignment} #{variable_assignments}", "SCHEMA")
-        end
-
         def column_definitions(table_name) # :nodoc:
           internal_exec_query("SHOW FULL FIELDS FROM #{quote_table_name(table_name)}", "SCHEMA", allow_retry: true)
         end
@@ -1052,6 +1002,87 @@ module ActiveRecord
             raise DatabaseVersionError, "Unable to parse MySQL version from #{full_version_string.inspect}"
           end
         end
+
+        private
+          def configure_connection
+            super
+
+            return if @config[:skip_autoconfigure]
+
+            configure_settings
+          end
+
+          def configure_settings
+            variables = @config.fetch(:variables, {}).stringify_keys
+
+            # Increase timeout so the server doesn't disconnect us.
+            variables["wait_timeout"] = set_wait_timeout
+
+            defaults = [":default", :default].to_set
+
+            sql_mode_assignment = set_sql_mode(variables, defaults)
+            variable_assignments = set_variable_assignments(variables, defaults)
+
+            # ...and send them all in one query
+            raw_execute("SET #{set_encoding} #{sql_mode_assignment} #{variable_assignments}", "SCHEMA")
+          end
+
+          def set_encoding
+            return unless @config[:encoding]
+
+            # NAMES does not have an equals sign, see
+            # https://dev.mysql.com/doc/refman/en/set-names.html
+            # (trailing comma because variable_assignments will always have content)
+            encoding = +"NAMES #{@config[:encoding]}"
+            encoding << " COLLATE #{@config[:collation]}" if @config[:collation]
+            encoding << ", "
+          end
+
+          def set_wait_timeout
+            return if @config[:wait_timeout] == false
+
+            wait_timeout = self.class.type_cast_config_to_integer(@config[:wait_timeout])
+            if wait_timeout.is_a?(Integer)
+              wait_timeout
+            else
+              2147483
+            end
+          end
+
+          def set_variable_assignments(variables, defaults)
+            return if @config[:session_variables] == false
+
+            # Gather up all of the SET variables...
+            variables.filter_map do |k, v|
+              if defaults.include?(v)
+                "@@SESSION.#{k} = DEFAULT" # Sets the value to the global or compile default
+              elsif !v.nil?
+                "@@SESSION.#{k} = #{quote(v)}"
+              end
+            end.join(", ")
+          end
+
+          def set_sql_mode(variables, defaults)
+            return if @config[:sql_mode] == false
+
+            # Make MySQL reject illegal values rather than truncating or blanking them, see
+            # https://dev.mysql.com/doc/refman/en/sql-mode.html#sqlmode_strict_all_tables
+            # If the user has provided another value for sql_mode, don't replace it.
+            if sql_mode = variables.delete("sql_mode")
+              sql_mode = quote(sql_mode)
+            elsif !defaults.include?(strict_mode?)
+              if strict_mode?
+                sql_mode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')"
+              else
+                sql_mode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')"
+                sql_mode = "REPLACE(#{sql_mode}, 'STRICT_ALL_TABLES', '')"
+                sql_mode = "REPLACE(#{sql_mode}, 'TRADITIONAL', '')"
+              end
+              sql_mode = "CONCAT(#{sql_mode}, ',NO_AUTO_VALUE_ON_ZERO')"
+            end
+
+            "@@SESSION.sql_mode = #{sql_mode}, " if sql_mode
+          end
     end
   end
 end
