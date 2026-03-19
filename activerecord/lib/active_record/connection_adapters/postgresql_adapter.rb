@@ -370,7 +370,6 @@ module ActiveRecord
         @notice_receiver_sql_warnings = []
 
         @use_insert_returning = @config.key?(:insert_returning) ? self.class.type_cast_config_to_boolean(@config[:insert_returning]) : true
-        @server_default_timezone = nil
       end
 
       def connected?
@@ -1031,10 +1030,6 @@ module ActiveRecord
         def configure_connection
           super
 
-          # Capture the server's default timezone from the fresh connection
-          # so we can restore it later if needed.
-          @server_default_timezone = @raw_connection.parameter_status("TimeZone")
-
           if @config[:encoding]
             @raw_connection.set_client_encoding(@config[:encoding])
           end
@@ -1102,26 +1097,24 @@ module ActiveRecord
           # If using Active Record's time zone support configure the connection
           # to return TIMESTAMP WITH ZONE types in UTC.
           if default_timezone == :utc
-            internal_set_config("TimeZone", "UTC")
+            intent = QueryIntent.new(adapter: self, processed_sql: "SET SESSION timezone TO 'UTC'", name: "SCHEMA")
+            intent.execute!
+            intent.finish
           else
-            internal_set_config("TimeZone", @server_default_timezone)
+            intent = QueryIntent.new(adapter: self, processed_sql: "SET SESSION timezone TO DEFAULT", name: "SCHEMA")
+            intent.execute!
+            intent.finish
           end
         end
 
         # Sets a PostgreSQL session configuration variable. Uses parameter_status
-        # to skip redundant SET commands when the server already has the desired value.
-        # Pass nil as value to SET TO DEFAULT.
+        # to skip redundant SET commands when the server already has the desired
+        # value. Pass nil as value to SET TO DEFAULT.
         def internal_set_config(setting, value)
-          with_raw_connection(allow_retry: false, materialize_transactions: false) do |conn|
-            # If the server already reports this value via parameter_status,
-            # we can skip the SET entirely.
-            if value && conn.parameter_status(setting) == value.to_s
-              return
-            end
+          return if value && @raw_connection.parameter_status(setting) == value.to_s
 
-            quoted_value = value ? quote(value) : "DEFAULT"
-            query_command("SET SESSION #{setting} TO #{quoted_value}", "SCHEMA")
-          end
+          quoted_value = value ? quote(value) : "DEFAULT"
+          query_command("SET SESSION #{setting} TO #{quoted_value}", "SCHEMA")
         end
 
         # Returns the list of a table's column names, data types, and default values.
