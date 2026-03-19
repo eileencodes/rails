@@ -137,6 +137,140 @@ module ActiveRecord
         end
       end
 
+      def test_set_standard_conforming_strings_deprecation
+        assert_deprecated(ActiveRecord.deprecator) do
+          @connection.set_standard_conforming_strings
+        end
+      end
+
+      def test_configure_connection_sets_default_settings
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(db_config.configuration_hash)
+        connection.connect!
+
+        assert_equal "on", connection.query_value("SHOW standard_conforming_strings")
+        assert_equal "iso_8601", connection.query_value("SHOW intervalstyle")
+        assert_equal "warning", connection.query_value("SHOW client_min_messages")
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_skips_standard_conforming_strings_when_false
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(standard_conforming_strings: false)
+        )
+
+        log = capture_sql(include_schema: true) do
+          connection.connect!
+        end
+
+        assert_not log.any? { |sql| sql.include?("standard_conforming_strings") },
+          "Expected no SET standard_conforming_strings query, but found one in: #{log.inspect}"
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_skips_intervalstyle_when_false
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(intervalstyle: false)
+        )
+
+        log = capture_sql(include_schema: true) do
+          connection.connect!
+        end
+
+        assert_not log.any? { |sql| sql.include?("IntervalStyle") },
+          "Expected no SET IntervalStyle query, but found one in: #{log.inspect}"
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_skips_client_min_messages_when_false
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(min_messages: false)
+        )
+
+        log = capture_sql(include_schema: true) do
+          connection.connect!
+        end
+
+        assert_not log.any? { |sql| sql.include?("client_min_messages") },
+          "Expected no SET client_min_messages query, but found one in: #{log.inspect}"
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_skips_schema_search_path_when_false
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(schema_search_path: false)
+        )
+
+        log = capture_sql(include_schema: true) do
+          connection.connect!
+        end
+
+        assert_not log.any? { |sql| sql.match?(/SET.*search_path/) },
+          "Expected no SET search_path query, but found one in: #{log.inspect}"
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_custom_min_messages
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(min_messages: "notice")
+        )
+        connection.connect!
+
+        assert_equal "notice", connection.query_value("SHOW client_min_messages")
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_variables_are_set
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(variables: { statement_timeout: "5000" })
+        )
+        connection.connect!
+
+        assert_equal "5s", connection.query_value("SHOW statement_timeout")
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_variables_can_override_defaults
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(variables: { client_min_messages: "error" })
+        )
+        connection.connect!
+
+        # The :variables hash entry should win over the default "warning"
+        assert_equal "error", connection.query_value("SHOW client_min_messages")
+      ensure
+        connection&.disconnect!
+      end
+
+      def test_configure_connection_variables_with_default_value
+        db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+        connection = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.new(
+          db_config.configuration_hash.merge(
+            variables: { client_min_messages: :default }
+          )
+        )
+        connection.connect!
+
+        # :default resets to the server's compile-time default which is "notice"
+        assert_equal "notice", connection.query_value("SHOW client_min_messages")
+      ensure
+        connection&.disconnect!
+      end
+
       def test_schema_search_path_is_reapplied_after_reconnect
         db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
 

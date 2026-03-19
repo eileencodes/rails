@@ -370,6 +370,7 @@ module ActiveRecord
         @notice_receiver_sql_warnings = []
 
         @use_insert_returning = @config.key?(:insert_returning) ? self.class.type_cast_config_to_boolean(@config[:insert_returning]) : true
+        @server_default_timezone = nil
       end
 
       def connected?
@@ -443,8 +444,9 @@ module ActiveRecord
       end
 
       def set_standard_conforming_strings
-        query_command("SET standard_conforming_strings = on", "SCHEMA")
+        internal_set_config("standard_conforming_strings", "on")
       end
+      deprecate :set_standard_conforming_strings, deprecator: ActiveRecord.deprecator
 
       def supports_ddl_transactions?
         true
@@ -1029,11 +1031,13 @@ module ActiveRecord
         def configure_connection
           super
 
+          # Capture the server's default timezone from the fresh connection
+          # so we can restore it later if needed.
+          @server_default_timezone = @raw_connection.parameter_status("TimeZone")
+
           if @config[:encoding]
             @raw_connection.set_client_encoding(@config[:encoding])
           end
-          self.client_min_messages = @config[:min_messages] || "warning"
-          self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
 
           unless ActiveRecord.db_warnings_action.nil?
             @raw_connection.set_notice_receiver do |result|
@@ -1044,23 +1048,39 @@ module ActiveRecord
             end
           end
 
-          # Use standard-conforming strings so we don't have to do the E'...' dance.
-          set_standard_conforming_strings
+          # Build a single hash of all settings we want to configure, then
+          # set them all through internal_set_config which can skip redundant
+          # SETs by checking parameter_status.
+          settings = {}
 
-          variables = @config.fetch(:variables, {}).stringify_keys
+          # Use standard-conforming strings so we don't have to do the E'...' dance.
+          settings["standard_conforming_strings"] = "on" unless @config[:standard_conforming_strings] == false
 
           # Set interval output format to ISO 8601 for ease of parsing by ActiveSupport::Duration.parse
-          query_command("SET intervalstyle = iso_8601", "SCHEMA")
+          settings["IntervalStyle"] = "iso_8601" unless @config[:intervalstyle] == false
 
-          # SET statements from :variables config hash
+          unless @config[:min_messages] == false
+            settings["client_min_messages"] = @config[:min_messages] || "warning"
+          end
+
+          # Merge in user-provided variables from :variables config hash.
           # https://www.postgresql.org/docs/current/static/sql-set.html
-          variables.map do |k, v|
+          @config.fetch(:variables, {}).stringify_keys.each do |k, v|
             if v == ":default" || v == :default
-              # Sets the value to the global or compile default
-              query_command("SET SESSION #{k} TO DEFAULT", "SCHEMA")
+              settings[k] = nil # nil signals "SET TO DEFAULT"
             elsif !v.nil?
-              query_command("SET SESSION #{k} TO #{quote(v)}", "SCHEMA")
+              settings[k] = v
             end
+          end
+
+          settings.each do |setting, value|
+            internal_set_config(setting, value)
+          end
+
+          # search_path uses unquoted, comma-separated identifiers so it
+          # goes through the existing setter rather than internal_set_config.
+          unless @config[:schema_search_path] == false
+            self.schema_search_path = @config[:schema_search_path] || @config[:schema_order]
           end
 
           add_pg_encoders
@@ -1082,13 +1102,25 @@ module ActiveRecord
           # If using Active Record's time zone support configure the connection
           # to return TIMESTAMP WITH ZONE types in UTC.
           if default_timezone == :utc
-            intent = QueryIntent.new(adapter: self, processed_sql: "SET SESSION timezone TO 'UTC'", name: "SCHEMA")
-            intent.execute!
-            intent.finish
+            internal_set_config("TimeZone", "UTC")
           else
-            intent = QueryIntent.new(adapter: self, processed_sql: "SET SESSION timezone TO DEFAULT", name: "SCHEMA")
-            intent.execute!
-            intent.finish
+            internal_set_config("TimeZone", @server_default_timezone)
+          end
+        end
+
+        # Sets a PostgreSQL session configuration variable. Uses parameter_status
+        # to skip redundant SET commands when the server already has the desired value.
+        # Pass nil as value to SET TO DEFAULT.
+        def internal_set_config(setting, value)
+          with_raw_connection(allow_retry: false, materialize_transactions: false) do |conn|
+            # If the server already reports this value via parameter_status,
+            # we can skip the SET entirely.
+            if value && conn.parameter_status(setting) == value.to_s
+              return
+            end
+
+            quoted_value = value ? quote(value) : "DEFAULT"
+            query_command("SET SESSION #{setting} TO #{quoted_value}", "SCHEMA")
           end
         end
 
