@@ -11,6 +11,32 @@ class Mysql2AdapterTest < ActiveRecord::Mysql2TestCase
     @original_db_warnings_action = :ignore
   end
 
+  def test_configure_connection_skips_wait_timeout_when_false
+    db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+    connection = ActiveRecord::ConnectionAdapters::Mysql2Adapter.new(
+      db_config.configuration_hash.merge(wait_timeout: false)
+    )
+    connection.connect!
+
+    # When wait_timeout is false, the server's default wait_timeout should
+    # be preserved instead of being overridden to 2147483.
+    wait_timeout = connection.query_value("SELECT @@SESSION.wait_timeout").to_i
+    assert_not_equal 2147483, wait_timeout
+  ensure
+    connection&.disconnect!
+  end
+
+  def test_configure_connection_sets_default_wait_timeout
+    db_config = ActiveRecord::Base.configurations.configs_for(env_name: "arunit", name: "primary")
+    connection = ActiveRecord::ConnectionAdapters::Mysql2Adapter.new(db_config.configuration_hash)
+    connection.connect!
+
+    wait_timeout = connection.query_value("SELECT @@SESSION.wait_timeout").to_i
+    assert_equal 2147483, wait_timeout
+  ensure
+    connection&.disconnect!
+  end
+
   def test_connection_error
     error = assert_raises ActiveRecord::ConnectionNotEstablished do
       ActiveRecord::ConnectionAdapters::Mysql2Adapter.new(socket: File::NULL, prepared_statements: false).connect!

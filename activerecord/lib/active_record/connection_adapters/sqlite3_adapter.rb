@@ -874,16 +874,23 @@ module ActiveRecord
         end
 
         def configure_connection
-          if @config[:timeout]
-            timeout = self.class.type_cast_config_to_integer(@config[:timeout])
-            raise TypeError, "timeout must be integer, not #{timeout}" unless timeout.is_a?(Integer)
-            @raw_connection.busy_handler_timeout = timeout
+          # Set to false in config to skip.
+          unless @config[:timeout] == false
+            if @config[:timeout]
+              timeout = self.class.type_cast_config_to_integer(@config[:timeout])
+              raise TypeError, "timeout must be integer, not #{timeout}" unless timeout.is_a?(Integer)
+              @raw_connection.busy_handler_timeout = timeout
+            end
           end
 
           super
 
+          # User-provided pragmas override defaults. Individual pragmas can
+          # be set to false to skip them entirely.
           pragmas = @config.fetch(:pragmas, {}).stringify_keys
           DEFAULT_PRAGMAS.merge(pragmas).each do |pragma, value|
+            next if value == false
+
             if ::SQLite3::Pragmas.method_defined?("#{pragma}=")
               @raw_connection.public_send("#{pragma}=", value)
             else
