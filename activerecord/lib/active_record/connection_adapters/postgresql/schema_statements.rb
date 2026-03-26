@@ -307,7 +307,12 @@ module ActiveRecord
         def schema_search_path=(schema_csv)
           return if schema_csv == @schema_search_path
           if schema_csv
-            query_command("SET search_path TO #{schema_csv}", "SCHEMA")
+            # Check parameter_status to skip redundant SET when the server
+            # already has the desired search_path (e.g. on initial connection).
+            current = with_raw_connection(materialize_transactions: false) { |conn| conn.parameter_status("search_path") }
+            unless current == schema_csv
+              query_command("SET search_path TO #{schema_csv}", "SCHEMA")
+            end
             @schema_search_path = schema_csv
           end
         end

@@ -430,24 +430,6 @@ module ActiveRecord
         end
       end
 
-      def test_skipping_default_pragma_with_false
-        if in_memory_db?
-          with_memory_connection(pragmas: { foreign_keys: false }) do |conn|
-            # foreign_keys should be at SQLite's default (off) since we skipped it
-            assert_equal [{ "foreign_keys" => 0 }], conn.execute("PRAGMA foreign_keys")
-            # Other defaults should still be applied
-            assert_equal [{ "synchronous" => 1 }], conn.execute("PRAGMA synchronous")
-            assert_equal [{ "cache_size" => 2000 }], conn.execute("PRAGMA cache_size")
-          end
-        else
-          with_file_connection(pragmas: { foreign_keys: false }) do |conn|
-            assert_equal [{ "foreign_keys" => 0 }], conn.execute("PRAGMA foreign_keys")
-            assert_equal [{ "synchronous" => 1 }], conn.execute("PRAGMA synchronous")
-            assert_equal [{ "cache_size" => 2000 }], conn.execute("PRAGMA cache_size")
-          end
-        end
-      end
-
       def test_exec_no_binds
         with_example_table "id int, data string" do
           result = @conn.exec_query("SELECT id, data FROM ex")

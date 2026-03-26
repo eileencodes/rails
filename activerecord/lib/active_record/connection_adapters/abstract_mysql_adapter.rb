@@ -1038,33 +1038,31 @@ module ActiveRecord
             variables["wait_timeout"] = wait_timeout
           end
 
-          defaults = [":default", :default].to_set
+          defaults = [":default", :default, false].to_set
 
           # Make MySQL reject illegal values rather than truncating or blanking them, see
           # https://dev.mysql.com/doc/refman/en/sql-mode.html#sqlmode_strict_all_tables
           # If the user has provided another value for sql_mode, don't replace it.
-          # Set sql_mode to false in config to skip.
-          unless @config[:sql_mode] == false
-            if sql_mode = variables.delete("sql_mode")
-              sql_mode = quote(sql_mode)
-            elsif !defaults.include?(strict_mode?)
-              if strict_mode?
-                sql_mode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')"
-              else
-                sql_mode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')"
-                sql_mode = "REPLACE(#{sql_mode}, 'STRICT_ALL_TABLES', '')"
-                sql_mode = "REPLACE(#{sql_mode}, 'TRADITIONAL', '')"
-              end
-              sql_mode = "CONCAT(#{sql_mode}, ',NO_AUTO_VALUE_ON_ZERO')"
+          # Set sql_mode to false or :default in variables to skip.
+          if variables.key?("sql_mode")
+            sql_mode_value = variables.delete("sql_mode")
+            sql_mode = quote(sql_mode_value) unless defaults.include?(sql_mode_value)
+          elsif !defaults.include?(strict_mode?)
+            if strict_mode?
+              sql_mode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')"
+            else
+              sql_mode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')"
+              sql_mode = "REPLACE(#{sql_mode}, 'STRICT_ALL_TABLES', '')"
+              sql_mode = "REPLACE(#{sql_mode}, 'TRADITIONAL', '')"
             end
+            sql_mode = "CONCAT(#{sql_mode}, ',NO_AUTO_VALUE_ON_ZERO')"
           end
           sql_mode_assignment = "@@SESSION.sql_mode = #{sql_mode}, " if sql_mode
 
           # NAMES does not have an equals sign, see
           # https://dev.mysql.com/doc/refman/en/set-names.html
           # (trailing comma because variable_assignments will always have content)
-          # Set encoding to false in config to skip.
-          if @config[:encoding] && @config[:encoding] != false
+          if @config[:encoding]
             encoding = +"NAMES #{@config[:encoding]}"
             encoding << " COLLATE #{@config[:collation]}" if @config[:collation]
             encoding << ", "
